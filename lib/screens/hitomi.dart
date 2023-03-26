@@ -143,18 +143,29 @@ class _HitomiDetailScreenState extends State<HitomiDetailScreen> {
             return PageView(
               children: [
                 for (var i = 0; i < snapshot.data!['files'].length; i++)
-                  Image.network(
-                      'https://api.toshu.me/images/webp/${snapshot.data!['files'][i]['hash']}',
-                      loadingBuilder: (context, child, loadingProgress) {
-                    if (loadingProgress == null) return child;
-                    return const Center(
-                      child: CircularProgressIndicator(),
-                    );
-                  }, errorBuilder: (context, error, stackTrace) {
-                    return const Center(
-                      child: Text('Error'),
-                    );
-                  }),
+                  Stack(
+                    children: [
+                      Center(
+                        child: Image.network(
+                            'https://api.toshu.me/images/webp/${snapshot.data!['files'][i]['hash']}',
+                            loadingBuilder: (context, child, loadingProgress) {
+                          if (loadingProgress == null) return child;
+                          return const Center(
+                            child: CircularProgressIndicator(),
+                          );
+                        }, errorBuilder: (context, error, stackTrace) {
+                          return const Center(
+                            child: Text('Error'),
+                          );
+                        }),
+                      ),
+                      Positioned(
+                          left: 0,
+                          bottom: 0,
+                          child: Text(
+                              '${i + 1}/${snapshot.data!['files'].length}')),
+                    ],
+                  ),
               ],
             );
           } else if (snapshot.hasError) {
