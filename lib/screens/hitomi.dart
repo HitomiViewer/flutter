@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 
 import '../widgets/preview.dart';
@@ -109,6 +110,9 @@ class _HitomiDetailScreenState extends State<HitomiDetailScreen> {
   late Future<Map<String, dynamic>> detail;
   late HitomiDetailArguments args;
 
+  final PageController _controller = PageController();
+  final FocusNode _focusNode = FocusNode();
+
   @override
   void initState() {
     super.initState();
@@ -121,60 +125,91 @@ class _HitomiDetailScreenState extends State<HitomiDetailScreen> {
     detail = fetchDetail(args.id.toString());
   }
 
+  void _handleKeyEvent(RawKeyEvent event) {
+    var page = _controller.page; //Getting current position
+    if (event.runtimeType ==
+        RawKeyDownEvent) //Checking if the event is keydown event
+    {
+      if (event.logicalKey.debugName == "Arrow Left") {
+        setState(() {
+          _controller.previousPage(
+              duration: const Duration(milliseconds: 200), curve: Curves.ease);
+        });
+      } else if (event.logicalKey.debugName == "Arrow Right") {
+        setState(() {
+          _controller.nextPage(
+              duration: const Duration(milliseconds: 200), curve: Curves.ease);
+        });
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-          title: FutureBuilder(
-        future: detail,
-        builder: (context, AsyncSnapshot<Map<String, dynamic>> snapshot) {
-          if (snapshot.hasData) {
-            return Text(snapshot.data!['title']);
-          } else if (snapshot.hasError) {
-            return Text('${snapshot.error}');
-          }
-          return const Text('Loading...');
-        },
-      )),
-      body: FutureBuilder(
-        future: detail,
-        builder: (context, AsyncSnapshot<Map<String, dynamic>> snapshot) {
-          if (snapshot.hasData) {
-            return PageView(
-              allowImplicitScrolling: true,
-              children: [
-                for (var i = 0; i < snapshot.data!['files'].length; i++)
-                  Stack(
-                    children: [
-                      Center(
-                        child: Image.network(
-                            'https://api.toshu.me/images/webp/${snapshot.data!['files'][i]['hash']}',
-                            loadingBuilder: (context, child, loadingProgress) {
-                          if (loadingProgress == null) return child;
-                          return const Center(
-                            child: CircularProgressIndicator(),
-                          );
-                        }, errorBuilder: (context, error, stackTrace) {
-                          return const Center(
-                            child: Text('Error'),
-                          );
-                        }),
+        appBar: AppBar(
+            title: FutureBuilder(
+          future: detail,
+          builder: (context, AsyncSnapshot<Map<String, dynamic>> snapshot) {
+            if (snapshot.hasData) {
+              return Text(snapshot.data!['title']);
+            } else if (snapshot.hasError) {
+              return Text('${snapshot.error}');
+            }
+            return const Text('Loading...');
+          },
+        )),
+        body: RawKeyboardListener(
+          autofocus: true,
+          focusNode: _focusNode,
+          onKey: _handleKeyEvent,
+          child: FutureBuilder(
+            future: detail,
+            builder: (context, AsyncSnapshot<Map<String, dynamic>> snapshot) {
+              if (snapshot.hasData) {
+                return PageView(
+                  controller: _controller,
+                  allowImplicitScrolling: true,
+                  children: [
+                    for (var i = 0; i < snapshot.data!['files'].length; i++)
+                      Stack(
+                        children: [
+                          Center(
+                            child: Image.network(
+                                'https://api.toshu.me/images/webp/${snapshot.data!['files'][i]['hash']}',
+                                loadingBuilder:
+                                    (context, child, loadingProgress) {
+                              if (loadingProgress == null) return child;
+                              return const Center(
+                                child: CircularProgressIndicator(),
+                              );
+                            }, errorBuilder: (context, error, stackTrace) {
+                              return const Center(
+                                child: Text('Error'),
+                              );
+                            }),
+                          ),
+                          Positioned(
+                              left: 0,
+                              bottom: 0,
+                              child: Text(
+                                  '${i + 1}/${snapshot.data!['files'].length}')),
+                        ],
                       ),
-                      Positioned(
-                          left: 0,
-                          bottom: 0,
-                          child: Text(
-                              '${i + 1}/${snapshot.data!['files'].length}')),
-                    ],
-                  ),
-              ],
-            );
-          } else if (snapshot.hasError) {
-            return Text('${snapshot.error}');
-          }
-          return const CircularProgressIndicator();
-        },
-      ),
-    );
+                  ],
+                );
+              } else if (snapshot.hasError) {
+                return Text('${snapshot.error}');
+              }
+              return const CircularProgressIndicator();
+            },
+          ),
+        ));
+  }
+
+  @override
+  void dispose() {
+    _focusNode.dispose();
+    super.dispose();
   }
 }
