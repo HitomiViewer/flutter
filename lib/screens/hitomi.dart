@@ -141,6 +141,7 @@ class _HitomiDetailScreenState extends State<HitomiDetailScreen> {
         builder: (context, AsyncSnapshot<Map<String, dynamic>> snapshot) {
           if (snapshot.hasData) {
             return PageView(
+              allowImplicitScrolling: true,
               children: [
                 for (var i = 0; i < snapshot.data!['files'].length; i++)
                   Stack(
