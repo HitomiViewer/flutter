@@ -1,7 +1,6 @@
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
-import 'package:hitomiviewer/models/detail.dart';
 import 'package:hitomiviewer/screens/hitomi.dart';
 import 'package:http/http.dart' as http;
 
@@ -34,7 +33,7 @@ class _PreviewState extends State<Preview> {
               visualDensity: const VisualDensity(vertical: 4),
               title: Text(snapshot.data!['title']),
               leading: Image.network(
-                  'http://localhost:3000/images/preview/${snapshot.data!['files'][0]['hash']}'),
+                  'https://api.toshu.me/images/preview/${snapshot.data!['files'][0]['hash']}'),
               trailing: Text(snapshot.data!['language'] ?? 'N/A'),
               minLeadingWidth: 100,
               onTap: () {
@@ -51,7 +50,7 @@ class _PreviewState extends State<Preview> {
 }
 
 Future<Map<String, dynamic>> fetchDetail(String id) async {
-  final response = await http.get(Uri.http('localhost:3000', '/detail/$id'));
+  final response = await http.get(Uri.https('api.toshu.me', '/detail/$id'));
 
   if (response.statusCode == 200) {
     // 만약 서버가 OK 응답을 반환하면, JSON을 파싱합니다.
