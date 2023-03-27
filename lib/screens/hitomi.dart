@@ -43,18 +43,24 @@ class _HitomiScreenState extends State<HitomiScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Hitomi'),
+        title: Text(args.query == null || args.query == ''
+            ? 'Hitomi.la'
+            : 'Hitomi.la - ${args.query}'),
       ),
       body: Center(
         child: FutureBuilder(
           future: galleries,
           builder: (context, AsyncSnapshot<List<int>> snapshot) {
             if (snapshot.hasData) {
-              return (ListView.builder(
+              return (ListView.separated(
                 itemCount: snapshot.data!.length,
                 itemBuilder: (context, index) {
                   return Preview(id: snapshot.data![index]);
                 },
+                padding:
+                    const EdgeInsets.symmetric(vertical: 32, horizontal: 20),
+                separatorBuilder: (context, index) =>
+                    const SizedBox(height: 10),
               ));
             } else if (snapshot.hasError) {
               return Text('${snapshot.error}');
@@ -180,13 +186,9 @@ class _HitomiDetailScreenState extends State<HitomiDetailScreen> {
                                 loadingBuilder:
                                     (context, child, loadingProgress) {
                               if (loadingProgress == null) return child;
-                              return const Center(
-                                child: CircularProgressIndicator(),
-                              );
+                              return const CircularProgressIndicator();
                             }, errorBuilder: (context, error, stackTrace) {
-                              return const Center(
-                                child: Text('Error'),
-                              );
+                              return const Text('Error');
                             }),
                           ),
                           Positioned(
@@ -199,9 +201,9 @@ class _HitomiDetailScreenState extends State<HitomiDetailScreen> {
                   ],
                 );
               } else if (snapshot.hasError) {
-                return Text('${snapshot.error}');
+                return Center(child: Text('${snapshot.error}'));
               }
-              return const CircularProgressIndicator();
+              return const Center(child: CircularProgressIndicator());
             },
           ),
         ));

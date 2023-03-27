@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:hitomiviewer/screens/hitomi.dart';
+import 'package:hitomiviewer/widgets/tag.dart';
 import 'package:http/http.dart' as http;
 
 class Preview extends StatefulWidget {
@@ -28,7 +29,7 @@ class _PreviewState extends State<Preview> {
       future: detail,
       builder: (context, AsyncSnapshot<Map<String, dynamic>> snapshot) {
         if (snapshot.hasData) {
-          return ListTile(
+          ListTile(
               dense: true,
               visualDensity: const VisualDensity(vertical: 4),
               title: Text(snapshot.data!['title']),
@@ -40,6 +41,72 @@ class _PreviewState extends State<Preview> {
                 Navigator.pushNamed(context, '/hitomi/detail',
                     arguments: HitomiDetailArguments(id: widget.id));
               });
+          return GestureDetector(
+              onTap: () {
+                Navigator.pushNamed(context, '/hitomi/detail',
+                    arguments: HitomiDetailArguments(id: widget.id));
+              },
+              child: Container(
+                height: 100,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(5),
+                  color: const Color(0xFFF3F2F1),
+                ),
+                child: Row(children: [
+                  Container(
+                    // width: 100, height: auto
+                    constraints: const BoxConstraints.expand(width: 100),
+                    color: Colors.white,
+                    child: Image.network(
+                        'https://api.toshu.me/images/preview/${snapshot.data!['files'][0]['hash']}'),
+                  ),
+                  Flexible(
+                    flex: 1,
+                    child: Container(
+                        padding: const EdgeInsets.all(12),
+                        constraints: const BoxConstraints.expand(),
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.start,
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(children: [
+                              Flexible(
+                                  fit: FlexFit.tight,
+                                  child: Text(snapshot.data!['title'],
+                                      softWrap: false,
+                                      overflow: TextOverflow.fade,
+                                      style: const TextStyle(
+                                          fontWeight: FontWeight.w600,
+                                          fontSize: 16,
+                                          fontFamily: 'Pretendard'))),
+                              const SizedBox(width: 10),
+                              Text(
+                                  snapshot.data!['date']
+                                      .toString()
+                                      .split(' ')[0],
+                                  style: const TextStyle(
+                                      color: Color(0xFFBBBBBB),
+                                      fontWeight: FontWeight.w500,
+                                      fontSize: 10)),
+                            ]),
+                            const SizedBox(height: 10),
+                            Flexible(
+                                fit: FlexFit.tight,
+                                child: Wrap(
+                                  clipBehavior: Clip.antiAliasWithSaveLayer,
+                                  runSpacing: 2,
+                                  spacing: 2,
+                                  children: [
+                                    for (var tag
+                                        in snapshot.data!['tags'] ?? [])
+                                      Tag(tag: TagData.fromJson(tag)),
+                                  ],
+                                )),
+                          ],
+                        )),
+                  ),
+                ]),
+              ));
         } else if (snapshot.hasError) {
           return Text('${snapshot.error}');
         }
