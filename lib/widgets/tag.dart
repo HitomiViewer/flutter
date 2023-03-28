@@ -1,5 +1,3 @@
-import 'dart:ffi';
-
 import 'package:flutter/material.dart';
 
 class TagData {
@@ -22,9 +20,9 @@ class TagData {
   factory TagData.fromJson(Map<String, dynamic> json) {
     return TagData(
       tag: json['tag'] as String,
-      type: json['female'] == 1
+      type: json['female'].toString() == "1"
           ? 'female'
-          : json['male'] == 1
+          : json['male'].toString() == "1"
               ? 'male'
               : 'tag',
     );
