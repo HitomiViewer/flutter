@@ -132,16 +132,13 @@ class _HitomiDetailScreenState extends State<HitomiDetailScreen> {
   }
 
   void _handleKeyEvent(RawKeyEvent event) {
-    var page = _controller.page; //Getting current position
-    if (event.runtimeType ==
-        RawKeyDownEvent) //Checking if the event is keydown event
-    {
-      if (event.logicalKey.debugName == "Arrow Left") {
+    if (event.runtimeType == RawKeyDownEvent) {
+      if (event.logicalKey == LogicalKeyboardKey.arrowLeft) {
         setState(() {
           _controller.previousPage(
               duration: const Duration(milliseconds: 200), curve: Curves.ease);
         });
-      } else if (event.logicalKey.debugName == "Arrow Right") {
+      } else if (event.logicalKey == LogicalKeyboardKey.arrowRight) {
         setState(() {
           _controller.nextPage(
               duration: const Duration(milliseconds: 200), curve: Curves.ease);
