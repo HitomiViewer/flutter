@@ -22,6 +22,9 @@ void main() {
       '/hitomi': (context) => const HitomiScreen(),
       '/hitomi/detail': (context) => const HitomiDetailScreen(),
     },
+    theme: ThemeData(),
+    darkTheme: ThemeData.dark(),
+    themeMode: ThemeMode.system,
     scrollBehavior: AppScrollBehavior(),
   ));
 }

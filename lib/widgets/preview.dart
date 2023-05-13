@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/scheduler.dart';
 import 'package:hitomiviewer/screens/hitomi.dart';
 import 'package:hitomiviewer/widgets/tag.dart';
 import 'package:http/http.dart' as http;
@@ -16,6 +17,13 @@ class Preview extends StatefulWidget {
 }
 
 class _PreviewState extends State<Preview> {
+  bool get isDarkMode => Theme.of(context).brightness == Brightness.dark;
+  Color get backgroundColor =>
+      isDarkMode ? const Color(0xFF1C1C1C) : const Color(0xFFF3F2F1);
+  Color get imageBackgroundColor => isDarkMode
+      ? Theme.of(context).colorScheme.surface
+      : Theme.of(context).colorScheme.surface;
+
   late Future<Map<String, dynamic>> detail;
 
   @override
@@ -39,13 +47,13 @@ class _PreviewState extends State<Preview> {
                 height: 100,
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(5),
-                  color: const Color(0xFFF3F2F1),
+                  color: backgroundColor,
                 ),
                 child: Row(children: [
                   Container(
                       // width: 100, height: auto
                       constraints: const BoxConstraints.expand(width: 100),
-                      color: Colors.white,
+                      color: imageBackgroundColor,
                       child: CachedNetworkImage(
                         imageUrl:
                             'https://api.toshu.me/images/preview/${snapshot.data!['files'][0]['hash']}',
