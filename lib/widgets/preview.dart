@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:hitomiviewer/screens/hitomi.dart';
 import 'package:hitomiviewer/widgets/tag.dart';
@@ -29,18 +30,6 @@ class _PreviewState extends State<Preview> {
       future: detail,
       builder: (context, AsyncSnapshot<Map<String, dynamic>> snapshot) {
         if (snapshot.hasData) {
-          ListTile(
-              dense: true,
-              visualDensity: const VisualDensity(vertical: 4),
-              title: Text(snapshot.data!['title']),
-              leading: Image.network(
-                  'https://api.toshu.me/images/preview/${snapshot.data!['files'][0]['hash']}'),
-              trailing: Text(snapshot.data!['language'] ?? 'N/A'),
-              minLeadingWidth: 100,
-              onTap: () {
-                Navigator.pushNamed(context, '/hitomi/detail',
-                    arguments: HitomiDetailArguments(id: widget.id));
-              });
           return GestureDetector(
               onTap: () {
                 Navigator.pushNamed(context, '/hitomi/detail',
@@ -54,12 +43,24 @@ class _PreviewState extends State<Preview> {
                 ),
                 child: Row(children: [
                   Container(
-                    // width: 100, height: auto
-                    constraints: const BoxConstraints.expand(width: 100),
-                    color: Colors.white,
-                    child: Image.network(
-                        'https://api.toshu.me/images/preview/${snapshot.data!['files'][0]['hash']}'),
-                  ),
+                      // width: 100, height: auto
+                      constraints: const BoxConstraints.expand(width: 100),
+                      color: Colors.white,
+                      child: CachedNetworkImage(
+                        imageUrl:
+                            'https://api.toshu.me/images/preview/${snapshot.data!['files'][0]['hash']}',
+                        imageBuilder: (context, imageProvider) => Container(
+                          width: 100,
+                          height: 100,
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(5),
+                            image: DecorationImage(
+                              image: imageProvider,
+                              fit: BoxFit.contain,
+                            ),
+                          ),
+                        ),
+                      )),
                   Flexible(
                     flex: 1,
                     child: Container(
@@ -110,7 +111,9 @@ class _PreviewState extends State<Preview> {
         } else if (snapshot.hasError) {
           return Text('${snapshot.error}');
         }
-        return const LinearProgressIndicator();
+        return const LinearProgressIndicator(
+          minHeight: 100,
+        );
       },
     );
   }

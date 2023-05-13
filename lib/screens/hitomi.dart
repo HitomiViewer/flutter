@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
@@ -178,15 +179,12 @@ class _HitomiDetailScreenState extends State<HitomiDetailScreen> {
                       Stack(
                         children: [
                           Center(
-                            child: Image.network(
-                                'https://api.toshu.me/images/webp/${snapshot.data!['files'][i]['hash']}',
-                                loadingBuilder:
-                                    (context, child, loadingProgress) {
-                              if (loadingProgress == null) return child;
-                              return const CircularProgressIndicator();
-                            }, errorBuilder: (context, error, stackTrace) {
-                              return const Text('Error');
-                            }),
+                            child: CachedNetworkImage(
+                              placeholder: (context, url) =>
+                                  const CircularProgressIndicator(),
+                              imageUrl:
+                                  'https://api.toshu.me/images/webp/${snapshot.data!['files'][i]['hash']}',
+                            ),
                           ),
                           Positioned(
                               left: 0,
