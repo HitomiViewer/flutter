@@ -3,7 +3,9 @@ import 'dart:convert';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:hitomiviewer/store.dart';
 import 'package:http/http.dart' as http;
+import 'package:provider/provider.dart';
 
 import '../widgets/preview.dart';
 
@@ -34,9 +36,9 @@ class _HitomiScreenState extends State<HitomiScreen> {
     super.didChangeDependencies();
     args = ModalRoute.of(context)!.settings.arguments as HitomiScreenArguments?;
     if (args?.query == null || args?.query == '') {
-      galleries = fetchPost();
+      galleries = fetchPost(context.watch<Store>().language);
     } else {
-      galleries = searchGallery(args?.query);
+      galleries = searchGallery(args?.query, context.watch<Store>().language);
     }
   }
 
@@ -46,9 +48,11 @@ class _HitomiScreenState extends State<HitomiScreen> {
       appBar: AppBar(
         title: Text(
             args?.query == null || args?.query == '' ? '추천' : '${args?.query}'),
+        key: Key(context.watch<Store>().language),
       ),
       body: Center(
         child: FutureBuilder(
+          key: Key(context.watch<Store>().language),
           future: galleries,
           builder: (context, AsyncSnapshot<List<int>> snapshot) {
             if (snapshot.hasData) {
@@ -73,8 +77,10 @@ class _HitomiScreenState extends State<HitomiScreen> {
   }
 }
 
-Future<List<int>> fetchPost() async {
-  final response = await http.get(Uri.https('api.toshu.me', ''));
+Future<List<int>> fetchPost([String? language]) async {
+  final response = await http.get(Uri.https('api.toshu.me', '', {
+    language == null ? '' : 'language': language,
+  }));
 
   if (response.statusCode == 200) {
     // 만약 서버가 OK 응답을 반환하면, JSON을 파싱합니다.
@@ -85,10 +91,10 @@ Future<List<int>> fetchPost() async {
   }
 }
 
-Future<List<int>> searchGallery(query) async {
+Future<List<int>> searchGallery(query, [String? language]) async {
   final response = await http.get(Uri.https('api.toshu.me', '/search', {
     'query': query,
-    'language': 'korean',
+    language == null ? '' : 'language': language,
   }));
 
   if (response.statusCode == 200) {

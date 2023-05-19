@@ -1,5 +1,8 @@
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:hitomiviewer/screens/settings.dart';
+import 'package:hitomiviewer/store.dart';
+import 'package:provider/provider.dart';
 
 import 'screens/home.dart';
 import 'screens/hitomi.dart';
@@ -14,23 +17,29 @@ class AppScrollBehavior extends MaterialScrollBehavior {
 }
 
 void main() {
-  runApp(MaterialApp(
-    title: 'Flutter Demo',
-    initialRoute: '/',
-    routes: {
-      '/': (context) => const HomeScreen(),
-      '/hitomi': (context) => const HitomiScreen(),
-      '/hitomi/detail': (context) => const HitomiDetailScreen(),
-    },
-    theme: ThemeData(
-      colorScheme: ColorScheme.fromSwatch(
-        primarySwatch: Colors.blueGrey,
-        accentColor: Colors.blueGrey,
-        brightness: Brightness.light,
+  runApp(MultiProvider(
+    providers: [
+      ChangeNotifierProvider(create: (context) => Store()),
+    ],
+    child: MaterialApp(
+      title: 'Flutter Demo',
+      initialRoute: '/',
+      routes: {
+        '/': (context) => const HomeScreen(),
+        '/settings': (context) => const SettingScreen(),
+        '/hitomi': (context) => const HitomiScreen(),
+        '/hitomi/detail': (context) => const HitomiDetailScreen(),
+      },
+      theme: ThemeData(
+        colorScheme: ColorScheme.fromSwatch(
+          primarySwatch: Colors.blueGrey,
+          accentColor: Colors.blueGrey,
+          brightness: Brightness.light,
+        ),
       ),
+      darkTheme: ThemeData.dark(),
+      themeMode: ThemeMode.light,
+      scrollBehavior: AppScrollBehavior(),
     ),
-    darkTheme: ThemeData.dark(),
-    themeMode: ThemeMode.light,
-    scrollBehavior: AppScrollBehavior(),
   ));
 }
