@@ -22,7 +22,7 @@ class HitomiScreen extends StatefulWidget {
 
 class _HitomiScreenState extends State<HitomiScreen> {
   late Future<List<int>> galleries;
-  late HitomiScreenArguments args;
+  late HitomiScreenArguments? args;
 
   @override
   void initState() {
@@ -32,11 +32,11 @@ class _HitomiScreenState extends State<HitomiScreen> {
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    args = ModalRoute.of(context)!.settings.arguments as HitomiScreenArguments;
-    if (args.query == null || args.query == '') {
+    args = ModalRoute.of(context)!.settings.arguments as HitomiScreenArguments?;
+    if (args?.query == null || args?.query == '') {
       galleries = fetchPost();
     } else {
-      galleries = searchGallery(args.query);
+      galleries = searchGallery(args?.query);
     }
   }
 
@@ -44,9 +44,8 @@ class _HitomiScreenState extends State<HitomiScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text(args.query == null || args.query == ''
-            ? 'Hitomi.la'
-            : 'Hitomi.la - ${args.query}'),
+        title: Text(
+            args?.query == null || args?.query == '' ? '추천' : '${args?.query}'),
       ),
       body: Center(
         child: FutureBuilder(
@@ -89,6 +88,7 @@ Future<List<int>> fetchPost() async {
 Future<List<int>> searchGallery(query) async {
   final response = await http.get(Uri.https('api.toshu.me', '/search', {
     'query': query,
+    'language': 'korean',
   }));
 
   if (response.statusCode == 200) {
