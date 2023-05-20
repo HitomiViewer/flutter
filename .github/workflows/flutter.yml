@@ -89,6 +89,24 @@ jobs:
           path: build/windows/runner/Release
           retention-days: 5
 
+  ios-build:
+    runs-on: macos-latest
+
+    steps:
+      - uses: actions/checkout@v3
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: "stable"
+          cache: true
+      - run: flutter pub get
+      - run: flutter build ios --release --no-codesign
+      - name: Upload Build Artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: ios
+          path: build/ios/iphoneos/Runner.app
+          retention-days: 5
+
   macos-build:
     runs-on: macos-latest
 
