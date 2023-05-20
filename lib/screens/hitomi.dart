@@ -22,6 +22,9 @@ class _HitomiScreenState extends State<HitomiScreen> {
   late Future<List<int>> galleries;
   late HitomiScreenArguments? args;
 
+  get hasQuery => args?.query != null && args?.query != '';
+  get query => args?.query;
+
   @override
   void initState() {
     super.initState();
@@ -41,11 +44,11 @@ class _HitomiScreenState extends State<HitomiScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: Text(
-            args?.query == null || args?.query == '' ? '추천' : '${args?.query}'),
-        key: Key(context.watch<Store>().language),
-      ),
+      appBar: hasQuery
+          ? AppBar(
+              title: Text(query),
+            )
+          : null,
       body: Center(
         child: FutureBuilder(
           key: Key(context.watch<Store>().language),
