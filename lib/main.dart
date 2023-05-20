@@ -28,7 +28,7 @@ void main() {
         '/': (context) => const HomeScreen(),
         '/settings': (context) => const SettingScreen(),
         '/hitomi': (context) => const HitomiScreen(),
-        '/hitomi/detail': (context) => const HitomiDetailScreen(),
+        '/hitomi/detail': (context) => const HitomiReaderScreen(),
       },
       theme: ThemeData(
         colorScheme: ColorScheme.fromSwatch(

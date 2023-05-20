@@ -21,7 +21,7 @@ void main() {
       routes: {
         '/': (context) => const HomeScreen(title: 'Flutter Demo Home Page'),
         '/hitomi': (context) => const HitomiScreen(),
-        '/hitomi/detail': (context) => const HitomiDetailScreen(),
+        '/hitomi/detail': (context) => const HitomiReaderScreen(),
       },
       scrollBehavior: AppScrollBehavior(),
     ));

@@ -41,7 +41,17 @@ class _PreviewState extends State<Preview> {
           return GestureDetector(
               onTap: () {
                 Navigator.pushNamed(context, '/hitomi/detail',
-                    arguments: HitomiDetailArguments(id: widget.id));
+                    arguments: HitomiReaderArguments(id: widget.id));
+              },
+              onLongPress: () {
+                showDialog(
+                  context: context,
+                  builder: (context) => Dialog(
+                    child: HitomiDetailScreen(
+                      detail: snapshot.data!,
+                    ),
+                  ),
+                );
               },
               child: Container(
                 height: 100,
@@ -50,7 +60,17 @@ class _PreviewState extends State<Preview> {
                   color: backgroundColor,
                 ),
                 child: Row(children: [
-                  Container(
+                  GestureDetector(
+                    onLongPress: () => showDialog(
+                      context: context,
+                      builder: (context) => Dialog(
+                        child: CachedNetworkImage(
+                          imageUrl:
+                              'https://api.toshu.me/images/preview/${snapshot.data!['files'][0]['hash']}',
+                        ),
+                      ),
+                    ),
+                    child: Container(
                       // width: 100, height: auto
                       constraints: const BoxConstraints.expand(width: 100),
                       color: imageBackgroundColor,
@@ -68,7 +88,9 @@ class _PreviewState extends State<Preview> {
                             ),
                           ),
                         ),
-                      )),
+                      ),
+                    ),
+                  ),
                   Flexible(
                     flex: 1,
                     child: Container(

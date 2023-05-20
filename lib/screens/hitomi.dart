@@ -8,6 +8,7 @@ import 'package:http/http.dart' as http;
 import 'package:provider/provider.dart';
 
 import '../widgets/preview.dart';
+import '../widgets/tag.dart';
 
 class HitomiScreenArguments {
   final String? query;
@@ -106,22 +107,25 @@ Future<List<int>> searchGallery(query, [String? language]) async {
   }
 }
 
-class HitomiDetailArguments {
+class HitomiReaderArguments {
   final int id;
 
-  HitomiDetailArguments({required this.id});
+  HitomiReaderArguments({required this.id});
 }
 
-class HitomiDetailScreen extends StatefulWidget {
-  const HitomiDetailScreen({Key? key}) : super(key: key);
+class HitomiReaderScreen extends StatefulWidget {
+  final int? id;
+  final bool isFullScreen;
+  const HitomiReaderScreen({Key? key, this.id, this.isFullScreen = false})
+      : super(key: key);
 
   @override
-  State<HitomiDetailScreen> createState() => _HitomiDetailScreenState();
+  State<HitomiReaderScreen> createState() => _HitomiReaderScreenState();
 }
 
-class _HitomiDetailScreenState extends State<HitomiDetailScreen> {
+class _HitomiReaderScreenState extends State<HitomiReaderScreen> {
   late Future<Map<String, dynamic>> detail;
-  late HitomiDetailArguments args;
+  late HitomiReaderArguments? args;
 
   final PageController _controller = PageController();
   final FocusNode _focusNode = FocusNode();
@@ -134,8 +138,8 @@ class _HitomiDetailScreenState extends State<HitomiDetailScreen> {
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    args = ModalRoute.of(context)!.settings.arguments as HitomiDetailArguments;
-    detail = fetchDetail(args.id.toString());
+    args = ModalRoute.of(context)!.settings.arguments as HitomiReaderArguments?;
+    detail = fetchDetail((args?.id ?? widget.id).toString());
   }
 
   void _handleKeyEvent(RawKeyEvent event) {
@@ -150,6 +154,8 @@ class _HitomiDetailScreenState extends State<HitomiDetailScreen> {
           _controller.nextPage(
               duration: const Duration(milliseconds: 200), curve: Curves.ease);
         });
+      } else if (event.logicalKey == LogicalKeyboardKey.escape) {
+        Navigator.pop(context);
       }
     }
   }
@@ -157,18 +163,40 @@ class _HitomiDetailScreenState extends State<HitomiDetailScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-        appBar: AppBar(
-            title: FutureBuilder(
-          future: detail,
-          builder: (context, AsyncSnapshot<Map<String, dynamic>> snapshot) {
-            if (snapshot.hasData) {
-              return Text(snapshot.data!['title']);
-            } else if (snapshot.hasError) {
-              return Text('${snapshot.error}');
-            }
-            return const Text('Loading...');
-          },
-        )),
+        appBar: widget.isFullScreen
+            ? null
+            : AppBar(
+                title: FutureBuilder(
+                  future: detail,
+                  builder:
+                      (context, AsyncSnapshot<Map<String, dynamic>> snapshot) {
+                    if (snapshot.hasData) {
+                      return Text(snapshot.data!['title']);
+                    } else if (snapshot.hasError) {
+                      return Text('${snapshot.error}');
+                    }
+                    return const Text('Loading...');
+                  },
+                ),
+                actions: [
+                  IconButton(
+                    icon: const Icon(Icons.fullscreen),
+                    onPressed: () {
+                      Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) {
+                              return HitomiReaderScreen(
+                                id: args?.id ?? widget.id,
+                                isFullScreen: true,
+                              );
+                            },
+                            fullscreenDialog: true,
+                          ));
+                    },
+                  ),
+                ],
+              ),
         body: RawKeyboardListener(
           autofocus: true,
           focusNode: _focusNode,
@@ -190,6 +218,7 @@ class _HitomiDetailScreenState extends State<HitomiDetailScreen> {
                                   const CircularProgressIndicator(),
                               imageUrl:
                                   'https://api.toshu.me/images/webp/${snapshot.data!['files'][i]['hash']}',
+                              filterQuality: FilterQuality.high,
                             ),
                           ),
                           Positioned(
@@ -214,5 +243,120 @@ class _HitomiDetailScreenState extends State<HitomiDetailScreen> {
   void dispose() {
     _focusNode.dispose();
     super.dispose();
+  }
+}
+
+class HitomiDetailScreen extends StatefulWidget {
+  final Map<String, dynamic> detail;
+  const HitomiDetailScreen({Key? key, required this.detail}) : super(key: key);
+
+  @override
+  State<HitomiDetailScreen> createState() => _HitomiDetailScreenState();
+}
+
+class _HitomiDetailScreenState extends State<HitomiDetailScreen> {
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(widget.detail['title']),
+      ),
+      body: LayoutBuilder(
+        builder: (context, constraints) => SingleChildScrollView(
+          child: Column(
+            children: [
+              SizedBox(
+                height: constraints.maxHeight,
+                width: constraints.maxWidth,
+                child: Row(
+                  children: [
+                    Flexible(
+                      child: CachedNetworkImage(
+                        imageUrl:
+                            'https://api.toshu.me/images/webp/${widget.detail['files'][0]['hash']}',
+                      ),
+                    ),
+                    Flexible(
+                      child: Column(
+                        children: [
+                          Text(widget.detail['title']),
+                          Text((widget.detail['artists'] ?? [])
+                              .map((x) => x['artist'])
+                              .join(', ')),
+                          Table(
+                            children: [
+                              TableRow(children: [
+                                Text('Group'),
+                                Text((widget.detail['groups'] ?? [])
+                                    .map((x) => x['group'])
+                                    .join(', ')),
+                              ]),
+                              TableRow(children: [
+                                Text('Type'),
+                                Text(widget.detail['type']),
+                              ]),
+                              TableRow(children: [
+                                Text('Language'),
+                                Text(
+                                  "${widget.detail['language']} (${widget.detail['language_localname']})",
+                                ),
+                              ]),
+                              TableRow(children: [
+                                Text('Series'),
+                                Text((widget.detail['parodys'] ?? [])
+                                    .map((x) => x['parody'])
+                                    .join(', ')),
+                              ]),
+                              TableRow(children: [
+                                Text('Characters'),
+                                Text((widget.detail['characters'] ?? [])
+                                    .map((x) => x['character'])
+                                    .join(', ')),
+                              ]),
+                              TableRow(children: [
+                                Text('Tags'),
+                                Wrap(
+                                  clipBehavior: Clip.antiAliasWithSaveLayer,
+                                  runSpacing: 2,
+                                  spacing: 2,
+                                  children: [
+                                    for (var tag
+                                        in widget.detail!['tags'] ?? [])
+                                      Tag(tag: TagData.fromJson(tag)),
+                                  ],
+                                ),
+                              ]),
+                              TableRow(children: [
+                                Text('Uploaded'),
+                                Text(widget.detail['date']),
+                              ]),
+                              TableRow(children: [
+                                Text('Pages'),
+                                Text(widget.detail['files'].length.toString()),
+                              ]),
+                            ],
+                          )
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              ListView.separated(
+                shrinkWrap: true,
+                itemCount: 2,
+                itemBuilder: (context, index) {
+                  return Preview(id: widget.detail['related'][index]);
+                },
+                padding:
+                    const EdgeInsets.symmetric(vertical: 32, horizontal: 20),
+                separatorBuilder: (context, index) =>
+                    const SizedBox(height: 10),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 }
