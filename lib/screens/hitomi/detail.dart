@@ -101,7 +101,7 @@ class _HitomiDetailScreenState extends State<HitomiDetailScreen> {
               ),
               ListView.separated(
                 shrinkWrap: true,
-                itemCount: 2,
+                itemCount: widget.detail['related'].length,
                 itemBuilder: (context, index) {
                   return Preview(id: widget.detail['related'][index]);
                 },
