@@ -19,7 +19,7 @@ void main() {
       title: 'Flutter Demo',
       initialRoute: '/',
       routes: {
-        '/': (context) => const HomeScreen(title: 'Flutter Demo Home Page'),
+        '/': (context) => const HomeScreen(),
         '/hitomi': (context) => const HitomiScreen(),
         '/hitomi/detail': (context) => const HitomiReaderScreen(),
       },

@@ -22,7 +22,7 @@ void main() {
       ChangeNotifierProvider(create: (context) => Store()),
     ],
     child: MaterialApp(
-      title: 'Flutter Demo',
+      title: 'Hitomi Viewer',
       initialRoute: '/',
       routes: {
         '/': (context) => const HomeScreen(),
