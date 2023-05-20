@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
-import 'package:provider/provider.dart';
 
-import '../store.dart';
 import 'hitomi.dart';
 
 GlobalKey homeScreenNavigator = GlobalKey(debugLabel: 'home_btm_nav');

@@ -4,6 +4,7 @@ import 'package:hitomiviewer/screens/settings.dart';
 import 'package:hitomiviewer/store.dart';
 import 'package:provider/provider.dart';
 
+import 'screens/hitomi/reader.dart';
 import 'screens/home.dart';
 import 'screens/hitomi.dart';
 

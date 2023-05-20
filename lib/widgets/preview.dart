@@ -1,11 +1,10 @@
-import 'dart:convert';
-
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/scheduler.dart';
-import 'package:hitomiviewer/screens/hitomi.dart';
+import 'package:hitomiviewer/api/hitomi.dart';
 import 'package:hitomiviewer/widgets/tag.dart';
-import 'package:http/http.dart' as http;
+
+import '../screens/hitomi/detail.dart';
+import '../screens/hitomi/reader.dart';
 
 class Preview extends StatefulWidget {
   final int id;
@@ -146,17 +145,5 @@ class _PreviewState extends State<Preview> {
         );
       },
     );
-  }
-}
-
-Future<Map<String, dynamic>> fetchDetail(String id) async {
-  final response = await http.get(Uri.https('api.toshu.me', '/detail/$id'));
-
-  if (response.statusCode == 200) {
-    // 만약 서버가 OK 응답을 반환하면, JSON을 파싱합니다.
-    return json.decode(response.body);
-  } else {
-    // 만약 응답이 OK가 아니면, 에러를 던집니다.
-    throw Exception('Failed to load post');
   }
 }

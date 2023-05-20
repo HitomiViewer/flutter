@@ -10,6 +10,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'package:hitomiviewer/main.dart';
 import 'package:hitomiviewer/screens/hitomi.dart';
+import 'package:hitomiviewer/screens/hitomi/reader.dart';
 import 'package:hitomiviewer/screens/home.dart';
 
 void main() {
