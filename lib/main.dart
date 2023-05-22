@@ -7,6 +7,7 @@ import 'package:provider/provider.dart';
 import 'screens/hitomi/reader.dart';
 import 'screens/home.dart';
 import 'screens/hitomi.dart';
+import 'screens/settings/blacklist.dart';
 
 class AppScrollBehavior extends MaterialScrollBehavior {
   @override
@@ -28,6 +29,7 @@ void main() {
       routes: {
         '/': (context) => const HomeScreen(),
         '/settings': (context) => const SettingScreen(),
+        '/settings/blacklist': (context) => const BlacklistScreen(),
         '/hitomi': (context) => const HitomiScreen(),
         '/hitomi/detail': (context) => const HitomiReaderScreen(),
       },

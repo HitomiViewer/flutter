@@ -42,6 +42,12 @@ class _SettingScreenState extends State<SettingScreen> {
                 onPressed: (context) async => context.read<Store>().setLanguage(
                     await prompt(context) ?? context.watch<Store>().language),
               ),
+              SettingsTile.navigation(
+                leading: const Icon(Icons.block),
+                title: const Text('Blacklist'),
+                onPressed: (context) =>
+                    Navigator.of(context).pushNamed('/settings/blacklist'),
+              ),
             ],
           ),
         ],
