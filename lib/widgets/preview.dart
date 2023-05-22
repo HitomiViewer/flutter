@@ -1,10 +1,14 @@
+import 'dart:ui';
+
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:hitomiviewer/api/hitomi.dart';
 import 'package:hitomiviewer/widgets/tag.dart';
+import 'package:provider/provider.dart';
 
 import '../screens/hitomi/detail.dart';
 import '../screens/hitomi/reader.dart';
+import '../store.dart';
 
 class Preview extends StatefulWidget {
   final int id;
@@ -32,11 +36,13 @@ class _PreviewState extends State<Preview> {
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext ctx) {
     return FutureBuilder(
       future: detail,
       builder: (context, AsyncSnapshot<Map<String, dynamic>> snapshot) {
         if (snapshot.hasData) {
+          bool blocked = checkBlocked(ctx, snapshot.data!['tags'] ?? []);
+          print(blocked);
           return GestureDetector(
               onTap: () {
                 Navigator.pushNamed(context, '/hitomi/detail',
@@ -73,17 +79,22 @@ class _PreviewState extends State<Preview> {
                       // width: 100, height: auto
                       constraints: const BoxConstraints.expand(width: 100),
                       color: imageBackgroundColor,
-                      child: CachedNetworkImage(
-                        imageUrl:
-                            'https://api.toshu.me/images/preview/${snapshot.data!['files'][0]['hash']}',
-                        imageBuilder: (context, imageProvider) => Container(
-                          width: 100,
-                          height: 100,
-                          decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(5),
-                            image: DecorationImage(
-                              image: imageProvider,
-                              fit: BoxFit.contain,
+                      child: ImageFiltered(
+                        imageFilter: ImageFilter.blur(
+                            sigmaX: 5, sigmaY: 5, tileMode: TileMode.decal),
+                        enabled: blocked,
+                        child: CachedNetworkImage(
+                          imageUrl:
+                              'https://api.toshu.me/images/preview/${snapshot.data!['files'][0]['hash']}',
+                          imageBuilder: (context, imageProvider) => Container(
+                            width: 100,
+                            height: 100,
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(5),
+                              image: DecorationImage(
+                                image: imageProvider,
+                                fit: BoxFit.contain,
+                              ),
                             ),
                           ),
                         ),
@@ -146,4 +157,16 @@ class _PreviewState extends State<Preview> {
       },
     );
   }
+}
+
+bool checkBlocked(BuildContext context, List<dynamic> tags) {
+  for (var tag in tags) {
+    String tagName = (tag['male'].toString() == "1" ? "male:" : "") +
+        (tag['female'].toString() == "1" ? "female:" : "") +
+        tag['tag'];
+    if (context.read<Store>().blacklist.contains(tagName)) {
+      return true;
+    }
+  }
+  return false;
 }
