@@ -28,7 +28,7 @@ class _PreviewState extends State<Preview> {
       future: detail,
       builder: (context, AsyncSnapshot<Map<String, dynamic>> snapshot) {
         if (snapshot.hasData) {
-          return ListTile(
+          ListTile(
               dense: true,
               visualDensity: const VisualDensity(vertical: 4),
               title: Text(snapshot.data!['title']),
@@ -40,6 +40,12 @@ class _PreviewState extends State<Preview> {
                 Navigator.pushNamed(context, '/hitomi/detail',
                     arguments: HitomiDetailArguments(id: widget.id));
               });
+          return Container(
+            decoration: BoxDecoration(
+              border: Border.all(color: Colors.white),
+              borderRadius: BorderRadius.circular(5),
+            ),
+          );
         } else if (snapshot.hasError) {
           return Text('${snapshot.error}');
         }

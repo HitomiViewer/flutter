@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:auto_route/auto_route.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
@@ -12,6 +13,7 @@ class HitomiScreenArguments {
   HitomiScreenArguments({this.query});
 }
 
+@RoutePage()
 class HitomiScreen extends StatefulWidget {
   const HitomiScreen({Key? key}) : super(key: key);
 
@@ -50,12 +52,14 @@ class _HitomiScreenState extends State<HitomiScreen> {
           future: galleries,
           builder: (context, AsyncSnapshot<List<int>> snapshot) {
             if (snapshot.hasData) {
-              return (ListView.builder(
-                itemCount: snapshot.data!.length,
-                itemBuilder: (context, index) {
-                  return Preview(id: snapshot.data![index]);
-                },
-              ));
+              return Container(
+                  color: const Color(0xFFF3F2F1),
+                  child: ListView.builder(
+                    itemCount: snapshot.data!.length,
+                    itemBuilder: (context, index) {
+                      return Preview(id: snapshot.data![index]);
+                    },
+                  ));
             } else if (snapshot.hasError) {
               return Text('${snapshot.error}');
             }
@@ -99,8 +103,11 @@ class HitomiDetailArguments {
   HitomiDetailArguments({required this.id});
 }
 
+@RoutePage()
 class HitomiDetailScreen extends StatefulWidget {
-  const HitomiDetailScreen({Key? key}) : super(key: key);
+  final int id;
+  const HitomiDetailScreen({Key? key, @PathParam('id') required this.id})
+      : super(key: key);
 
   @override
   State<HitomiDetailScreen> createState() => _HitomiDetailScreenState();

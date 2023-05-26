@@ -1,8 +1,6 @@
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
-
-import 'screens/home.dart';
-import 'screens/hitomi.dart';
+import 'package:hitomiviewer/app_router.dart';
 
 class AppScrollBehavior extends MaterialScrollBehavior {
   @override
@@ -14,14 +12,20 @@ class AppScrollBehavior extends MaterialScrollBehavior {
 }
 
 void main() {
-  runApp(MaterialApp(
-    title: 'Flutter Demo',
-    initialRoute: '/',
-    routes: {
-      '/': (context) => const HomeScreen(title: 'Flutter Demo Home Page'),
-      '/hitomi': (context) => const HitomiScreen(),
-      '/hitomi/detail': (context) => const HitomiDetailScreen(),
-    },
-    scrollBehavior: AppScrollBehavior(),
-  ));
+  runApp(App());
+}
+
+class App extends StatelessWidget {
+  final _appRouter = AppRouter();
+
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp.router(
+      title: 'Flutter Demo',
+      routerConfig: _appRouter.config(),
+      // routerDelegate: _appRouter.delegate(),
+      // routeInformationParser: _appRouter.defaultRouteParser(),
+      scrollBehavior: AppScrollBehavior(),
+    );
+  }
 }
