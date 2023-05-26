@@ -1,9 +1,8 @@
-import 'dart:convert';
-
 import 'package:auto_route/auto_route.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
-import 'package:http/http.dart' as http;
+import 'package:hitomiviewer/api/hitomi.dart';
+import 'package:hitomiviewer/store.dart';
+import 'package:provider/provider.dart';
 
 import '../widgets/preview.dart';
 
@@ -23,7 +22,10 @@ class HitomiScreen extends StatefulWidget {
 
 class _HitomiScreenState extends State<HitomiScreen> {
   late Future<List<int>> galleries;
-  late HitomiScreenArguments args;
+  late HitomiScreenArguments? args;
+
+  get hasQuery => args?.query != null && args?.query != '';
+  get query => args?.query;
 
   @override
   void initState() {
@@ -33,33 +35,38 @@ class _HitomiScreenState extends State<HitomiScreen> {
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    args = ModalRoute.of(context)!.settings.arguments as HitomiScreenArguments;
-    if (args.query == null || args.query == '') {
-      galleries = fetchPost();
+    args = ModalRoute.of(context)!.settings.arguments as HitomiScreenArguments?;
+    if (args?.query == null || args?.query == '') {
+      galleries = fetchPost(context.watch<Store>().language);
     } else {
-      galleries = searchGallery(args.query);
+      galleries = searchGallery(args?.query, context.watch<Store>().language);
     }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Hitomi'),
-      ),
+      appBar: hasQuery
+          ? AppBar(
+              title: Text(query),
+            )
+          : null,
       body: Center(
         child: FutureBuilder(
+          key: Key(context.watch<Store>().language),
           future: galleries,
           builder: (context, AsyncSnapshot<List<int>> snapshot) {
             if (snapshot.hasData) {
-              return Container(
-                  color: const Color(0xFFF3F2F1),
-                  child: ListView.builder(
-                    itemCount: snapshot.data!.length,
-                    itemBuilder: (context, index) {
-                      return Preview(id: snapshot.data![index]);
-                    },
-                  ));
+              return (ListView.separated(
+                itemCount: snapshot.data!.length,
+                itemBuilder: (context, index) {
+                  return Preview(id: snapshot.data![index]);
+                },
+                padding:
+                    const EdgeInsets.symmetric(vertical: 32, horizontal: 20),
+                separatorBuilder: (context, index) =>
+                    const SizedBox(height: 10),
+              ));
             } else if (snapshot.hasError) {
               return Text('${snapshot.error}');
             }
@@ -68,155 +75,5 @@ class _HitomiScreenState extends State<HitomiScreen> {
         ),
       ),
     );
-  }
-}
-
-Future<List<int>> fetchPost() async {
-  final response = await http.get(Uri.https('api.toshu.me', ''));
-
-  if (response.statusCode == 200) {
-    // 만약 서버가 OK 응답을 반환하면, JSON을 파싱합니다.
-    return List.castFrom<dynamic, int>(json.decode(response.body));
-  } else {
-    // 만약 응답이 OK가 아니면, 에러를 던집니다.
-    throw Exception('Failed to load post');
-  }
-}
-
-Future<List<int>> searchGallery(query) async {
-  final response = await http.get(Uri.https('api.toshu.me', '/search', {
-    'query': query,
-  }));
-
-  if (response.statusCode == 200) {
-    // 만약 서버가 OK 응답을 반환하면, JSON을 파싱합니다.
-    return List.castFrom<dynamic, int>(json.decode(response.body));
-  } else {
-    // 만약 응답이 OK가 아니면, 에러를 던집니다.
-    throw Exception('Failed to load post');
-  }
-}
-
-class HitomiDetailArguments {
-  final int id;
-
-  HitomiDetailArguments({required this.id});
-}
-
-@RoutePage()
-class HitomiDetailScreen extends StatefulWidget {
-  final int id;
-  const HitomiDetailScreen({Key? key, @PathParam('id') required this.id})
-      : super(key: key);
-
-  @override
-  State<HitomiDetailScreen> createState() => _HitomiDetailScreenState();
-}
-
-class _HitomiDetailScreenState extends State<HitomiDetailScreen> {
-  late Future<Map<String, dynamic>> detail;
-  late HitomiDetailArguments args;
-
-  final PageController _controller = PageController();
-  final FocusNode _focusNode = FocusNode();
-
-  @override
-  void initState() {
-    super.initState();
-  }
-
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    args = ModalRoute.of(context)!.settings.arguments as HitomiDetailArguments;
-    detail = fetchDetail(args.id.toString());
-  }
-
-  void _handleKeyEvent(RawKeyEvent event) {
-    var page = _controller.page; //Getting current position
-    if (event.runtimeType ==
-        RawKeyDownEvent) //Checking if the event is keydown event
-    {
-      if (event.logicalKey.debugName == "Arrow Left") {
-        setState(() {
-          _controller.previousPage(
-              duration: const Duration(milliseconds: 200), curve: Curves.ease);
-        });
-      } else if (event.logicalKey.debugName == "Arrow Right") {
-        setState(() {
-          _controller.nextPage(
-              duration: const Duration(milliseconds: 200), curve: Curves.ease);
-        });
-      }
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-        appBar: AppBar(
-            title: FutureBuilder(
-          future: detail,
-          builder: (context, AsyncSnapshot<Map<String, dynamic>> snapshot) {
-            if (snapshot.hasData) {
-              return Text(snapshot.data!['title']);
-            } else if (snapshot.hasError) {
-              return Text('${snapshot.error}');
-            }
-            return const Text('Loading...');
-          },
-        )),
-        body: RawKeyboardListener(
-          autofocus: true,
-          focusNode: _focusNode,
-          onKey: _handleKeyEvent,
-          child: FutureBuilder(
-            future: detail,
-            builder: (context, AsyncSnapshot<Map<String, dynamic>> snapshot) {
-              if (snapshot.hasData) {
-                return PageView(
-                  controller: _controller,
-                  allowImplicitScrolling: true,
-                  children: [
-                    for (var i = 0; i < snapshot.data!['files'].length; i++)
-                      Stack(
-                        children: [
-                          Center(
-                            child: Image.network(
-                                'https://api.toshu.me/images/webp/${snapshot.data!['files'][i]['hash']}',
-                                loadingBuilder:
-                                    (context, child, loadingProgress) {
-                              if (loadingProgress == null) return child;
-                              return const Center(
-                                child: CircularProgressIndicator(),
-                              );
-                            }, errorBuilder: (context, error, stackTrace) {
-                              return const Center(
-                                child: Text('Error'),
-                              );
-                            }),
-                          ),
-                          Positioned(
-                              left: 0,
-                              bottom: 0,
-                              child: Text(
-                                  '${i + 1}/${snapshot.data!['files'].length}')),
-                        ],
-                      ),
-                  ],
-                );
-              } else if (snapshot.hasError) {
-                return Text('${snapshot.error}');
-              }
-              return const CircularProgressIndicator();
-            },
-          ),
-        ));
-  }
-
-  @override
-  void dispose() {
-    _focusNode.dispose();
-    super.dispose();
   }
 }

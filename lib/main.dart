@@ -1,6 +1,8 @@
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:hitomiviewer/app_router.dart';
+import 'package:hitomiviewer/store.dart';
+import 'package:provider/provider.dart';
 
 class AppScrollBehavior extends MaterialScrollBehavior {
   @override
@@ -20,12 +22,24 @@ class App extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp.router(
-      title: 'Flutter Demo',
-      routerConfig: _appRouter.config(),
-      // routerDelegate: _appRouter.delegate(),
-      // routeInformationParser: _appRouter.defaultRouteParser(),
-      scrollBehavior: AppScrollBehavior(),
+    return MultiProvider(
+      providers: [
+        ChangeNotifierProvider(create: (context) => Store()),
+      ],
+      child: MaterialApp.router(
+        title: 'Hitomi Viewer',
+        routerConfig: _appRouter.config(),
+        theme: ThemeData(
+          colorScheme: ColorScheme.fromSwatch(
+            primarySwatch: Colors.blueGrey,
+            accentColor: Colors.blueGrey,
+            brightness: Brightness.light,
+          ),
+        ),
+        darkTheme: ThemeData.dark(),
+        themeMode: ThemeMode.light,
+        scrollBehavior: AppScrollBehavior(),
+      ),
     );
   }
 }

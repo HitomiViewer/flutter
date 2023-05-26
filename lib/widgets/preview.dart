@@ -1,8 +1,14 @@
-import 'dart:convert';
+import 'dart:ui';
 
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
-import 'package:hitomiviewer/screens/hitomi.dart';
-import 'package:http/http.dart' as http;
+import 'package:hitomiviewer/api/hitomi.dart';
+import 'package:hitomiviewer/widgets/tag.dart';
+import 'package:provider/provider.dart';
+
+import '../screens/hitomi/detail.dart';
+import '../screens/hitomi/reader.dart';
+import '../store.dart';
 
 class Preview extends StatefulWidget {
   final int id;
@@ -14,6 +20,13 @@ class Preview extends StatefulWidget {
 }
 
 class _PreviewState extends State<Preview> {
+  bool get isDarkMode => Theme.of(context).brightness == Brightness.dark;
+  Color get backgroundColor =>
+      isDarkMode ? const Color(0xFF1C1C1C) : const Color(0xFFF3F2F1);
+  Color get imageBackgroundColor => isDarkMode
+      ? Theme.of(context).colorScheme.surface
+      : Theme.of(context).colorScheme.surface;
+
   late Future<Map<String, dynamic>> detail;
 
   @override
@@ -23,46 +36,137 @@ class _PreviewState extends State<Preview> {
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext ctx) {
     return FutureBuilder(
       future: detail,
       builder: (context, AsyncSnapshot<Map<String, dynamic>> snapshot) {
         if (snapshot.hasData) {
-          ListTile(
-              dense: true,
-              visualDensity: const VisualDensity(vertical: 4),
-              title: Text(snapshot.data!['title']),
-              leading: Image.network(
-                  'https://api.toshu.me/images/preview/${snapshot.data!['files'][0]['hash']}'),
-              trailing: Text(snapshot.data!['language'] ?? 'N/A'),
-              minLeadingWidth: 100,
+          bool blocked = checkBlocked(ctx, snapshot.data!['tags'] ?? []);
+          print(blocked);
+          return GestureDetector(
               onTap: () {
                 Navigator.pushNamed(context, '/hitomi/detail',
-                    arguments: HitomiDetailArguments(id: widget.id));
-              });
-          return Container(
-            decoration: BoxDecoration(
-              border: Border.all(color: Colors.white),
-              borderRadius: BorderRadius.circular(5),
-            ),
-          );
+                    arguments: HitomiReaderArguments(id: widget.id));
+              },
+              onLongPress: () {
+                showDialog(
+                  context: context,
+                  builder: (context) => Dialog(
+                    child: HitomiDetailScreen(
+                      detail: snapshot.data!,
+                    ),
+                  ),
+                );
+              },
+              child: Container(
+                height: 100,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(5),
+                  color: backgroundColor,
+                ),
+                child: Row(children: [
+                  GestureDetector(
+                    onLongPress: () => showDialog(
+                      context: context,
+                      builder: (context) => Dialog(
+                        child: CachedNetworkImage(
+                          imageUrl:
+                              'https://api.toshu.me/images/preview/${snapshot.data!['files'][0]['hash']}',
+                        ),
+                      ),
+                    ),
+                    child: Container(
+                      // width: 100, height: auto
+                      constraints: const BoxConstraints.expand(width: 100),
+                      color: imageBackgroundColor,
+                      child: ImageFiltered(
+                        imageFilter: ImageFilter.blur(
+                            sigmaX: 5, sigmaY: 5, tileMode: TileMode.decal),
+                        enabled: blocked,
+                        child: CachedNetworkImage(
+                          imageUrl:
+                              'https://api.toshu.me/images/preview/${snapshot.data!['files'][0]['hash']}',
+                          imageBuilder: (context, imageProvider) => Container(
+                            width: 100,
+                            height: 100,
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(5),
+                              image: DecorationImage(
+                                image: imageProvider,
+                                fit: BoxFit.contain,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                  Flexible(
+                    flex: 1,
+                    child: Container(
+                        padding: const EdgeInsets.all(12),
+                        constraints: const BoxConstraints.expand(),
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.start,
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(children: [
+                              Flexible(
+                                  fit: FlexFit.tight,
+                                  child: Text(snapshot.data!['title'],
+                                      softWrap: false,
+                                      overflow: TextOverflow.fade,
+                                      style: const TextStyle(
+                                          fontWeight: FontWeight.w600,
+                                          fontSize: 16,
+                                          fontFamily: 'Pretendard'))),
+                              const SizedBox(width: 10),
+                              Text(
+                                  snapshot.data!['date']
+                                      .toString()
+                                      .split(' ')[0],
+                                  style: const TextStyle(
+                                      color: Color(0xFFBBBBBB),
+                                      fontWeight: FontWeight.w500,
+                                      fontSize: 10)),
+                            ]),
+                            const SizedBox(height: 10),
+                            Flexible(
+                                fit: FlexFit.tight,
+                                child: Wrap(
+                                  clipBehavior: Clip.antiAliasWithSaveLayer,
+                                  runSpacing: 2,
+                                  spacing: 2,
+                                  children: [
+                                    for (var tag
+                                        in snapshot.data!['tags'] ?? [])
+                                      Tag(tag: TagData.fromJson(tag)),
+                                  ],
+                                )),
+                          ],
+                        )),
+                  ),
+                ]),
+              ));
         } else if (snapshot.hasError) {
           return Text('${snapshot.error}');
         }
-        return const LinearProgressIndicator();
+        return const LinearProgressIndicator(
+          minHeight: 100,
+        );
       },
     );
   }
 }
 
-Future<Map<String, dynamic>> fetchDetail(String id) async {
-  final response = await http.get(Uri.https('api.toshu.me', '/detail/$id'));
-
-  if (response.statusCode == 200) {
-    // 만약 서버가 OK 응답을 반환하면, JSON을 파싱합니다.
-    return json.decode(response.body);
-  } else {
-    // 만약 응답이 OK가 아니면, 에러를 던집니다.
-    throw Exception('Failed to load post');
+bool checkBlocked(BuildContext context, List<dynamic> tags) {
+  for (var tag in tags) {
+    String tagName = (tag['male'].toString() == "1" ? "male:" : "") +
+        (tag['female'].toString() == "1" ? "female:" : "") +
+        tag['tag'];
+    if (context.read<Store>().blacklist.contains(tagName)) {
+      return true;
+    }
   }
+  return false;
 }
