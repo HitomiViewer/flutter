@@ -29,6 +29,9 @@ class _HitomiReaderScreenState extends State<HitomiReaderScreen> {
   @override
   void initState() {
     super.initState();
+    if (widget.isFullScreen) {
+      SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
+    }
   }
 
   @override
@@ -118,10 +121,17 @@ class _HitomiReaderScreenState extends State<HitomiReaderScreen> {
                             ),
                           ),
                           Positioned(
-                              left: 0,
-                              bottom: 0,
-                              child: Text(
-                                  '${i + 1}/${snapshot.data!['files'].length}')),
+                            top: 0,
+                            child: SafeArea(
+                              child: SizedBox(
+                                width: MediaQuery.of(context).size.width,
+                                child: Center(
+                                  child: Text(
+                                      '${i + 1}/${snapshot.data!['files'].length}'),
+                                ),
+                              ),
+                            ),
+                          ),
                         ],
                       ),
                   ],
@@ -137,6 +147,9 @@ class _HitomiReaderScreenState extends State<HitomiReaderScreen> {
 
   @override
   void dispose() {
+    if (widget.isFullScreen) {
+      SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+    }
     _focusNode.dispose();
     super.dispose();
   }
