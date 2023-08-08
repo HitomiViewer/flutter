@@ -11,6 +11,7 @@ class AppRouter extends $AppRouter {
   List<AutoRoute> get routes => [
         AutoRoute(path: '/', page: HomeRoute.page, initial: true),
         AutoRoute(path: '/hitomi', page: HitomiRoute.page),
+        AutoRoute(path: '/hitomi/ids', page: IdRoute.page),
         AutoRoute(path: '/hitomi/:id', page: HitomiReaderRoute.page),
         AutoRoute(path: '/settings', page: SettingRoute.page),
         AutoRoute(path: '/settings/blacklist', page: BlacklistRoute.page)

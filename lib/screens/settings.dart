@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:auto_route/auto_route.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:hitomiviewer/app_router.gr.dart';
 import 'package:prompt_dialog/prompt_dialog.dart';
 import 'package:provider/provider.dart';
 import 'package:settings_ui/settings_ui.dart';
@@ -96,6 +97,19 @@ class _SettingScreenState extends State<SettingScreen> {
               ),
             ],
           ),
+          SettingsSection(
+            title: const Text('Statistics'),
+            tiles: [
+              SettingsTile(
+                leading: const Icon(Icons.view_array),
+                title: const Text('Recent Viewed'),
+                description:
+                    Text('${context.watch<Store>().recent.length} items'),
+                onPressed: (context) => context.router
+                    .push(IdRoute(ids: context.watch<Store>().recent)),
+              ),
+            ],
+          )
           // SettingsSection(
           //   title: const Text('Viewer'),
           //   tiles: <SettingsTile>[
