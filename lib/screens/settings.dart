@@ -64,7 +64,9 @@ class _SettingScreenState extends State<SettingScreen> {
                 onPressed: (context) async {
                   final String? result = await prompt(context);
                   if (result != null) {
-                    context.read<Store>().setFavorite(json.decode(result));
+                    List<int> favorite = json.decode(result).cast<int>();
+                    Provider.of<Store>(context, listen: false)
+                        .setFavorite(favorite);
                   }
                 },
               ),
@@ -72,8 +74,8 @@ class _SettingScreenState extends State<SettingScreen> {
                 leading: const Icon(Icons.import_export),
                 title: const Text('Export'),
                 onPressed: (context) async {
-                  final String result =
-                      json.encode(context.watch<Store>().favorite);
+                  final String result = json.encode(
+                      Provider.of<Store>(context, listen: false).favorite);
                   Clipboard.setData(ClipboardData(text: result));
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(
