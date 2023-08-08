@@ -50,6 +50,14 @@ class Store extends ChangeNotifier {
     notifyListeners();
   }
 
+  toggleFavorite(int id) {
+    if (favorite.contains(id)) {
+      removeFavorite(id);
+    } else {
+      addFavorite(id);
+    }
+  }
+
   setFavorite(List<int> favorite) {
     this.favorite = favorite;
     this.favorite.sort((a, b) => b.compareTo(a));

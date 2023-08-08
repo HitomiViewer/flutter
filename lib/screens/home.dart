@@ -46,24 +46,24 @@ class HomeScreenState extends State<HomeScreen> {
           BottomNavigationBarItem(
             icon: SvgPicture.asset(
               'assets/icons/home.svg',
-              color: Theme.of(context).colorScheme.onBackground,
+              // color: Theme.of(context).colorScheme.onBackground,
             ),
             label: '홈',
           ),
           BottomNavigationBarItem(
             icon: SvgPicture.asset(
               'assets/icons/suggest.svg',
-              color: Theme.of(context).colorScheme.onBackground,
+              // color: Theme.of(context).colorScheme.onBackground,
             ),
             label: '추천',
           ),
-          BottomNavigationBarItem(
+          const BottomNavigationBarItem(
             // icon: SvgPicture.asset(
             //   'assets/icons/favorite.svg',
             // ),
             icon: Icon(
               Icons.favorite_border,
-              color: Theme.of(context).colorScheme.onBackground,
+              // color: Theme.of(context).colorScheme.onBackground,
             ),
             label: '즐겨찾기',
           ),

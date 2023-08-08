@@ -42,6 +42,9 @@ dependencies:
   prompt_dialog: ^1.0.10
   shared_preferences: ^2.1.1
   auto_route: ^7.2.0
+  flutter_expandable_fab: ^1.8.1
+  share_plus: ^7.0.2
+  scroll_to_index: ^3.0.1
 
 dev_dependencies:
   flutter_test:

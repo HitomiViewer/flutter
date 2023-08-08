@@ -1,6 +1,11 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter_expandable_fab/flutter_expandable_fab.dart';
+import 'package:hitomiviewer/screens/hitomi.dart';
 import 'package:provider/provider.dart';
+import 'package:scroll_to_index/scroll_to_index.dart';
+import 'package:share_plus/share_plus.dart';
 
 import '../../store.dart';
 import '../../widgets/preview.dart';
@@ -143,6 +148,55 @@ class _HitomiDetailScreenState extends State<HitomiDetailScreen> {
             ],
           ),
         ),
+      ),
+      floatingActionButtonLocation: ExpandableFab.location,
+      floatingActionButton: ExpandableFab(
+        type: ExpandableFabType.up,
+        distance: 60.0,
+        overlayStyle: ExpandableFabOverlayStyle(
+          color: Colors.black.withOpacity(0.5),
+        ),
+        children: [
+          FloatingActionButton.small(
+            heroTag: null,
+            child: const Icon(Icons.share),
+            onPressed: () {
+              try {
+                Share.share('https://toshu.me/#/hitomi/${widget.detail['id']}');
+              } catch (e) {}
+            },
+          ),
+          FloatingActionButton.small(
+            heroTag: null,
+            child: context
+                    .read<Store>()
+                    .containsFavorite(int.parse(widget.detail['id']))
+                ? const Icon(Icons.favorite)
+                : const Icon(Icons.favorite_border),
+            onPressed: () {
+              context
+                  .read<Store>()
+                  .toggleFavorite(int.parse(widget.detail['id']));
+              setState(() {});
+            },
+          ),
+          FloatingActionButton.small(
+            heroTag: null,
+            child: const Icon(Icons.copy),
+            onPressed: () {
+              Clipboard.setData(
+                ClipboardData(
+                  text: widget.detail['id'].toString(),
+                ),
+              );
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Copied to clipboard'),
+                ),
+              );
+            },
+          ),
+        ],
       ),
     );
   }

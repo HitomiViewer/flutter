@@ -1,8 +1,11 @@
 import 'package:auto_route/auto_route.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_expandable_fab/flutter_expandable_fab.dart';
 import 'package:hitomiviewer/api/hitomi.dart';
 import 'package:hitomiviewer/store.dart';
+import 'package:prompt_dialog/prompt_dialog.dart';
 import 'package:provider/provider.dart';
+import 'package:scroll_to_index/scroll_to_index.dart';
 
 import '../widgets/preview.dart';
 
@@ -23,6 +26,8 @@ class HitomiScreen extends StatefulWidget {
 
 class _HitomiScreenState extends State<HitomiScreen> {
   late Future<List<int>> galleries;
+
+  AutoScrollController _controller = AutoScrollController();
 
   get hasQuery => widget.query != null && widget.query != '';
   get query => widget.query;
@@ -57,9 +62,15 @@ class _HitomiScreenState extends State<HitomiScreen> {
           builder: (context, AsyncSnapshot<List<int>> snapshot) {
             if (snapshot.hasData) {
               return (ListView.separated(
+                controller: _controller,
                 itemCount: snapshot.data!.length,
                 itemBuilder: (context, index) {
-                  return Preview(id: snapshot.data![index]);
+                  return AutoScrollTag(
+                    key: ValueKey(snapshot.data![index]),
+                    controller: _controller,
+                    index: snapshot.data![index],
+                    child: Preview(id: snapshot.data![index]),
+                  );
                 },
                 padding:
                     const EdgeInsets.symmetric(vertical: 32, horizontal: 20),
@@ -72,6 +83,21 @@ class _HitomiScreenState extends State<HitomiScreen> {
             return const CircularProgressIndicator();
           },
         ),
+      ),
+      floatingActionButtonLocation: ExpandableFab.location,
+      floatingActionButton: ExpandableFab(
+        distance: 60,
+        children: [
+          FloatingActionButton.small(
+            heroTag: null,
+            child: const Icon(Icons.search),
+            onPressed: () async {
+              final id = await prompt(context);
+              _controller.scrollToIndex(int.parse(id ?? '0'),
+                  preferPosition: AutoScrollPosition.begin);
+            },
+          ),
+        ],
       ),
     );
   }
