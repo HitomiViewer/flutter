@@ -72,88 +72,112 @@ class _HitomiReaderScreenState extends State<HitomiReaderScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-        appBar: widget.isFullScreen
-            ? null
-            : AppBar(
-                title: FutureBuilder(
-                  future: detail,
-                  builder:
-                      (context, AsyncSnapshot<Map<String, dynamic>> snapshot) {
-                    if (snapshot.hasData) {
-                      return Text(snapshot.data!['title']);
-                    } else if (snapshot.hasError) {
-                      return Text('${snapshot.error}');
-                    }
-                    return const Text('Loading...');
+      appBar: widget.isFullScreen
+          ? null
+          : AppBar(
+              title: FutureBuilder(
+                future: detail,
+                builder:
+                    (context, AsyncSnapshot<Map<String, dynamic>> snapshot) {
+                  if (snapshot.hasData) {
+                    return Text(snapshot.data!['title']);
+                  } else if (snapshot.hasError) {
+                    return Text('${snapshot.error}');
+                  }
+                  return const Text('Loading...');
+                },
+              ),
+              actions: [
+                IconButton(
+                  icon: const Icon(Icons.fullscreen),
+                  onPressed: () {
+                    Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) {
+                            return HitomiReaderScreen(
+                              id: args?.id ?? widget.id,
+                              isFullScreen: true,
+                              initialPage: _controller.page!.toInt(),
+                            );
+                          },
+                          fullscreenDialog: true,
+                        ));
                   },
                 ),
-                actions: [
-                  IconButton(
-                    icon: const Icon(Icons.fullscreen),
-                    onPressed: () {
-                      Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) {
-                              return HitomiReaderScreen(
-                                id: args?.id ?? widget.id,
-                                isFullScreen: true,
-                                initialPage: _controller.page!.toInt(),
-                              );
-                            },
-                            fullscreenDialog: true,
-                          ));
-                    },
-                  ),
-                ],
-              ),
-        body: RawKeyboardListener(
-          autofocus: true,
-          focusNode: _focusNode,
-          onKey: _handleKeyEvent,
-          child: FutureBuilder(
-            future: detail,
-            builder: (context, AsyncSnapshot<Map<String, dynamic>> snapshot) {
-              if (snapshot.hasData) {
-                return PageView(
-                  controller: _controller,
-                  allowImplicitScrolling: true,
-                  children: [
-                    for (var i = 0; i < snapshot.data!['files'].length; i++)
-                      Stack(
-                        children: [
-                          Center(
-                            child: CachedNetworkImage(
-                              placeholder: (context, url) =>
-                                  const CircularProgressIndicator(),
-                              imageUrl:
-                                  'https://api.toshu.me/images/webp/${snapshot.data!['files'][i]['hash']}',
-                              filterQuality: FilterQuality.high,
-                            ),
+              ],
+            ),
+      body: RawKeyboardListener(
+        autofocus: true,
+        focusNode: _focusNode,
+        onKey: _handleKeyEvent,
+        child: FutureBuilder(
+          future: detail,
+          builder: (context, AsyncSnapshot<Map<String, dynamic>> snapshot) {
+            if (snapshot.hasData) {
+              return PageView(
+                controller: _controller,
+                allowImplicitScrolling: true,
+                children: [
+                  for (var i = 0; i < snapshot.data!['files'].length; i++)
+                    Stack(
+                      children: [
+                        Center(
+                          child: CachedNetworkImage(
+                            placeholder: (context, url) =>
+                                const CircularProgressIndicator(),
+                            imageUrl:
+                                'https://api.toshu.me/images/webp/${snapshot.data!['files'][i]['hash']}',
+                            filterQuality: FilterQuality.high,
                           ),
-                          Positioned(
-                            top: 0,
-                            child: SafeArea(
-                              child: SizedBox(
-                                width: MediaQuery.of(context).size.width,
-                                child: Center(
-                                  child: Text(
-                                      '${i + 1}/${snapshot.data!['files'].length}'),
-                                ),
+                        ),
+                        Positioned(
+                          top: 0,
+                          child: SafeArea(
+                            child: SizedBox(
+                              width: MediaQuery.of(context).size.width,
+                              child: Center(
+                                child: Text(
+                                    '${i + 1}/${snapshot.data!['files'].length}'),
                               ),
                             ),
                           ),
-                        ],
-                      ),
-                  ],
-                );
-              } else if (snapshot.hasError) {
-                return Center(child: Text('${snapshot.error}'));
-              }
-              return const Center(child: CircularProgressIndicator());
+                        ),
+                      ],
+                    ),
+                ],
+              );
+            } else if (snapshot.hasError) {
+              return Center(child: Text('${snapshot.error}'));
+            }
+            return const Center(child: CircularProgressIndicator());
+          },
+        ),
+      ),
+      floatingActionButton: FloatingActionButton(
+        // move to page of input number
+        onPressed: () {
+          showDialog(
+            context: context,
+            builder: (context) {
+              return AlertDialog(
+                title: const Text('Go to page'),
+                content: TextField(
+                  keyboardType: TextInputType.number,
+                  onSubmitted: (value) {
+                    setState(() {
+                      _controller.jumpToPage(int.parse(value) - 1);
+                    });
+                    Navigator.pop(context);
+                  },
+                ),
+              );
             },
-          ),
-        ));
+          );
+        },
+        child: const Icon(Icons.search),
+      ),
+    );
   }
 
   @override
