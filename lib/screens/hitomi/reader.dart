@@ -3,6 +3,8 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:hitomiviewer/api/hitomi.dart';
+import 'package:hitomiviewer/store.dart';
+import 'package:provider/provider.dart';
 
 class HitomiReaderArguments {
   final int id;
@@ -71,6 +73,7 @@ class _HitomiReaderScreenState extends State<HitomiReaderScreen> {
 
   @override
   Widget build(BuildContext context) {
+    context.read<Store>().addRecent((args?.id ?? widget.id)!);
     return Scaffold(
       appBar: widget.isFullScreen
           ? null
