@@ -20,6 +20,8 @@ class Store extends ChangeNotifier {
 
       favorite.sort((a, b) => b.compareTo(a));
 
+      refreshToken = prefs.getString('refreshToken') ?? refreshToken;
+
       notifyListeners();
     });
   }
