@@ -109,6 +109,35 @@ class _SettingScreenState extends State<SettingScreen> {
                     .push(IdRoute(ids: context.read<Store>().recent)),
               ),
             ],
+          ),
+          SettingsSection(
+            title: const Text('Account'),
+            tiles: <SettingsTile>[
+              context.read<Store>().refreshToken == ''
+                  ? SettingsTile(
+                      leading: const Icon(Icons.login),
+                      title: const Text('Login'),
+                      onPressed: (context) =>
+                          context.router.pushNamed('/auth/login'),
+                    )
+                  : SettingsTile(
+                      leading: const Icon(Icons.logout),
+                      title: const Text('Logout'),
+                      onPressed: (context) async {
+                        context.read<Store>().setRefreshToken('');
+                      },
+                    ),
+              ...context.read<Store>().refreshToken == ''
+                  ? []
+                  : [
+                      SettingsTile(
+                        leading: const Icon(Icons.account_circle),
+                        title: const Text('Info'),
+                        onPressed: (context) =>
+                            context.router.pushNamed('/auth/info'),
+                      )
+                    ],
+            ],
           )
           // SettingsSection(
           //   title: const Text('Viewer'),

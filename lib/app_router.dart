@@ -10,6 +10,10 @@ class AppRouter extends $AppRouter {
   @override
   List<AutoRoute> get routes => [
         AutoRoute(path: '/', page: HomeRoute.page, initial: true),
+        // AutoRoute(path: '/auth'),
+        AutoRoute(path: '/auth/info', page: InfoRoute.page),
+        AutoRoute(path: '/auth/login', page: LoginRoute.page),
+        AutoRoute(path: '/auth/register', page: RegisterRoute.page),
         AutoRoute(path: '/hitomi', page: HitomiRoute.page),
         AutoRoute(path: '/hitomi/ids', page: IdRoute.page),
         AutoRoute(path: '/hitomi/:id', page: HitomiReaderRoute.page),

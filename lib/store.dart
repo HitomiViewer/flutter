@@ -20,9 +20,21 @@ class Store extends ChangeNotifier {
 
       favorite.sort((a, b) => b.compareTo(a));
 
-      print(favorite);
       notifyListeners();
     });
+  }
+
+  var accessToken = '';
+  setAccessToken(String accessToken) {
+    this.accessToken = accessToken;
+    notifyListeners();
+  }
+
+  var refreshToken = '';
+  setRefreshToken(String refreshToken) {
+    this.refreshToken = refreshToken;
+    _prefs?.setString('refreshToken', refreshToken);
+    notifyListeners();
   }
 
   var language = 'korean';
