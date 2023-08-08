@@ -14,8 +14,12 @@ class HitomiReaderArguments {
 class HitomiReaderScreen extends StatefulWidget {
   final int? id;
   final bool isFullScreen;
+  final int initialPage;
   const HitomiReaderScreen(
-      {Key? key, @PathParam('id') required this.id, this.isFullScreen = false})
+      {Key? key,
+      @PathParam('id') required this.id,
+      this.isFullScreen = false,
+      this.initialPage = 0})
       : super(key: key);
 
   @override
@@ -26,7 +30,10 @@ class _HitomiReaderScreenState extends State<HitomiReaderScreen> {
   late Future<Map<String, dynamic>> detail;
   late HitomiReaderArguments? args;
 
-  final PageController _controller = PageController();
+  late final PageController _controller = PageController(
+    initialPage: widget.initialPage,
+  );
+
   final FocusNode _focusNode = FocusNode();
 
   @override
@@ -91,6 +98,7 @@ class _HitomiReaderScreenState extends State<HitomiReaderScreen> {
                               return HitomiReaderScreen(
                                 id: args?.id ?? widget.id,
                                 isFullScreen: true,
+                                initialPage: _controller.page!.toInt(),
                               );
                             },
                             fullscreenDialog: true,
