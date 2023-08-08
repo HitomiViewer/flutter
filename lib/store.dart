@@ -12,6 +12,11 @@ class Store extends ChangeNotifier {
           prefs.getStringList('favorite')?.map((e) => int.parse(e)).toList() ??
               favorite;
       blacklist = prefs.getStringList('blacklist') ?? blacklist;
+
+      favorite.sort((a, b) => b.compareTo(a));
+
+      print(favorite);
+      notifyListeners();
     });
   }
 
@@ -25,6 +30,7 @@ class Store extends ChangeNotifier {
   var favorite = <int>[];
   addFavorite(int id) {
     favorite.add(id);
+    favorite.sort((a, b) => b.compareTo(a));
     _prefs?.setStringList(
         'favorite', favorite.map((e) => e.toString()).toList());
     notifyListeners();
@@ -46,6 +52,7 @@ class Store extends ChangeNotifier {
 
   setFavorite(List<int> favorite) {
     this.favorite = favorite;
+    this.favorite.sort((a, b) => b.compareTo(a));
     _prefs?.setStringList(
         'favorite', favorite.map((e) => e.toString()).toList());
     notifyListeners();

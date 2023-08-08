@@ -14,7 +14,7 @@ class FavoriteScreen extends StatefulWidget {
 }
 
 class _FavoriteScreenState extends State<FavoriteScreen> {
-  get galleries => context.watch<Store>().favorite;
+  List<int> get galleries => context.watch<Store>().favorite;
 
   @override
   void initState() {
@@ -36,7 +36,10 @@ class _FavoriteScreenState extends State<FavoriteScreen> {
         child: ListView.separated(
           itemCount: galleries.length,
           itemBuilder: (context, index) {
-            return Preview(id: galleries[index]);
+            return Preview(
+              key: Key(galleries[index].toString()),
+              id: galleries[index],
+            );
           },
           padding: const EdgeInsets.symmetric(vertical: 32, horizontal: 20),
           separatorBuilder: (context, index) => const SizedBox(height: 10),
