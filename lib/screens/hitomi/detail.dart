@@ -10,6 +10,7 @@ import 'package:share_plus/share_plus.dart';
 import '../../store.dart';
 import '../../widgets/preview.dart';
 import '../../widgets/tag.dart';
+import 'reader.dart';
 
 class HitomiDetailScreen extends StatefulWidget {
   final Map<String, dynamic> detail;
@@ -37,13 +38,27 @@ class _HitomiDetailScreenState extends State<HitomiDetailScreen> {
                   children: [
                     Row(
                       children: [
-                        Flexible(
-                          child: CachedNetworkImage(
-                            imageUrl:
-                                'https://api.toshu.me/images/webp/${widget.detail['files'][0]['hash']}',
+                        Container(
+                          constraints: BoxConstraints(
+                            maxHeight: constraints.maxHeight,
+                            maxWidth: constraints.maxWidth / 2,
+                          ),
+                          child: GestureDetector(
+                            child: CachedNetworkImage(
+                              imageUrl:
+                                  'https://api.toshu.me/images/webp/${widget.detail['files'][0]['hash']}',
+                            ),
+                            onTap: () => showDialog(
+                              context: context,
+                              builder: (context) => Dialog(
+                                child: HitomiReaderScreen(
+                                  id: int.parse(widget.detail['id']),
+                                ),
+                              ),
+                            ),
                           ),
                         ),
-                        Flexible(
+                        Expanded(
                           child: Column(
                             children: [
                               Text(widget.detail['title']),
@@ -83,7 +98,6 @@ class _HitomiDetailScreenState extends State<HitomiDetailScreen> {
                                   TableRow(children: [
                                     const Text('Tags'),
                                     Wrap(
-                                      clipBehavior: Clip.antiAliasWithSaveLayer,
                                       runSpacing: 2,
                                       spacing: 2,
                                       children: [
@@ -103,34 +117,29 @@ class _HitomiDetailScreenState extends State<HitomiDetailScreen> {
                                         .toString()),
                                   ]),
                                 ],
+                              ),
+                              IconButton(
+                                icon: context.read<Store>().containsFavorite(
+                                        int.parse(widget.detail['id']))
+                                    ? const Icon(Icons.favorite)
+                                    : const Icon(Icons.favorite_border),
+                                onPressed: () {
+                                  if (context.read<Store>().containsFavorite(
+                                      int.parse(widget.detail['id']))) {
+                                    context.read<Store>().removeFavorite(
+                                        int.parse(widget.detail['id']));
+                                  } else {
+                                    context.read<Store>().addFavorite(
+                                        int.parse(widget.detail['id']));
+                                  }
+                                  setState(() {});
+                                },
                               )
                             ],
                           ),
                         ),
                       ],
                     ),
-                    Row(
-                      children: [
-                        IconButton(
-                          icon: context.read<Store>().containsFavorite(
-                                  int.parse(widget.detail['id']))
-                              ? const Icon(Icons.favorite)
-                              : const Icon(Icons.favorite_border),
-                          onPressed: () {
-                            if (context.read<Store>().containsFavorite(
-                                int.parse(widget.detail['id']))) {
-                              context.read<Store>().removeFavorite(
-                                  int.parse(widget.detail['id']));
-                            } else {
-                              context
-                                  .read<Store>()
-                                  .addFavorite(int.parse(widget.detail['id']));
-                            }
-                            setState(() {});
-                          },
-                        )
-                      ],
-                    )
                   ],
                 ),
               ),
@@ -163,7 +172,18 @@ class _HitomiDetailScreenState extends State<HitomiDetailScreen> {
             onPressed: () {
               try {
                 Share.share('https://toshu.me/#/hitomi/${widget.detail['id']}');
-              } catch (e) {}
+              } catch (e) {
+                Clipboard.setData(
+                  ClipboardData(
+                    text: 'https://toshu.me/#/hitomi/${widget.detail['id']}',
+                  ),
+                );
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Copied to clipboard'),
+                  ),
+                );
+              }
             },
           ),
           FloatingActionButton.small(
