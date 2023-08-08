@@ -39,7 +39,7 @@ class App extends StatelessWidget {
           ),
         ),
         darkTheme: ThemeData.dark(),
-        themeMode: ThemeMode.light,
+        themeMode: ThemeMode.system,
         scrollBehavior: AppScrollBehavior(),
       ),
     );
