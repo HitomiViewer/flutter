@@ -57,10 +57,11 @@ Future<Tokens> signup(String id, String password) async {
 }
 
 Future<String> refresh(String refreshToken) async {
-  final response = await http.get(Uri.https('api.toshu.me', '/auth/refresh'),
-      headers: {'Cookie': "Refresh=$refreshToken"});
+  final response = await http.post(
+      Uri.https('api.toshu.me', '/auth/refresh/app'),
+      body: {'refreshToken': refreshToken});
 
-  if (response.statusCode == 200) {
+  if (response.statusCode == 201) {
     return response.body;
   } else if (response.statusCode == 401) {
     throw Exception('Invalid refresh token');
