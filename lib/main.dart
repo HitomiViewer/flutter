@@ -1,13 +1,10 @@
+import 'package:auto_route/auto_route.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
-import 'package:hitomiviewer/screens/settings.dart';
+import 'package:hitomiviewer/app_router.dart';
+import 'package:hitomiviewer/app_router.gr.dart';
 import 'package:hitomiviewer/store.dart';
 import 'package:provider/provider.dart';
-
-import 'screens/hitomi/reader.dart';
-import 'screens/home.dart';
-import 'screens/hitomi.dart';
-import 'screens/settings/blacklist.dart';
 
 class AppScrollBehavior extends MaterialScrollBehavior {
   @override
@@ -19,30 +16,32 @@ class AppScrollBehavior extends MaterialScrollBehavior {
 }
 
 void main() {
-  runApp(MultiProvider(
-    providers: [
-      ChangeNotifierProvider(create: (context) => Store()),
-    ],
-    child: MaterialApp(
-      title: 'Hitomi Viewer',
-      initialRoute: '/',
-      routes: {
-        '/': (context) => const HomeScreen(),
-        '/settings': (context) => const SettingScreen(),
-        '/settings/blacklist': (context) => const BlacklistScreen(),
-        '/hitomi': (context) => const HitomiScreen(),
-        '/hitomi/detail': (context) => const HitomiReaderScreen(),
-      },
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSwatch(
-          primarySwatch: Colors.blueGrey,
-          accentColor: Colors.blueGrey,
-          brightness: Brightness.light,
+  runApp(App());
+}
+
+class App extends StatelessWidget {
+  final _appRouter = AppRouter();
+
+  @override
+  Widget build(BuildContext context) {
+    return MultiProvider(
+      providers: [
+        ChangeNotifierProvider(create: (context) => Store()),
+      ],
+      child: MaterialApp.router(
+        title: 'Hitomi Viewer',
+        routerConfig: _appRouter.config(),
+        theme: ThemeData(
+          colorScheme: ColorScheme.fromSwatch(
+            primarySwatch: Colors.blueGrey,
+            accentColor: Colors.blueGrey,
+            brightness: Brightness.light,
+          ),
         ),
+        darkTheme: ThemeData.dark(),
+        themeMode: ThemeMode.light,
+        scrollBehavior: AppScrollBehavior(),
       ),
-      darkTheme: ThemeData.dark(),
-      themeMode: ThemeMode.light,
-      scrollBehavior: AppScrollBehavior(),
-    ),
-  ));
+    );
+  }
 }

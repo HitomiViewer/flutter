@@ -1,3 +1,4 @@
+import 'package:auto_route/auto_route.dart';
 import 'package:flutter/material.dart';
 import 'package:hitomiviewer/api/hitomi.dart';
 import 'package:hitomiviewer/store.dart';
@@ -11,8 +12,10 @@ class HitomiScreenArguments {
   HitomiScreenArguments({this.query});
 }
 
+@RoutePage()
 class HitomiScreen extends StatefulWidget {
-  const HitomiScreen({Key? key}) : super(key: key);
+  final String? query;
+  const HitomiScreen({Key? key, this.query}) : super(key: key);
 
   @override
   State<HitomiScreen> createState() => _HitomiScreenState();
@@ -20,10 +23,9 @@ class HitomiScreen extends StatefulWidget {
 
 class _HitomiScreenState extends State<HitomiScreen> {
   late Future<List<int>> galleries;
-  late HitomiScreenArguments? args;
 
-  get hasQuery => args?.query != null && args?.query != '';
-  get query => args?.query;
+  get hasQuery => widget.query != null && widget.query != '';
+  get query => widget.query;
 
   @override
   void initState() {
@@ -33,11 +35,10 @@ class _HitomiScreenState extends State<HitomiScreen> {
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    args = ModalRoute.of(context)!.settings.arguments as HitomiScreenArguments?;
-    if (args?.query == null || args?.query == '') {
+    if (query == null || query == '') {
       galleries = fetchPost(context.watch<Store>().language);
     } else {
-      galleries = searchGallery(args?.query, context.watch<Store>().language);
+      galleries = searchGallery(query, context.watch<Store>().language);
     }
   }
 
