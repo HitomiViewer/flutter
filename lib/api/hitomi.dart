@@ -42,3 +42,7 @@ Future<List<int>> searchGallery(query, [String? language]) async {
     throw Exception('Failed to load post');
   }
 }
+
+Future<void> logId(String id) async {
+  await http.get(Uri.https('api.toshu.me', '/log/$id'));
+}

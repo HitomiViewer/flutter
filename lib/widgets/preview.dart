@@ -45,6 +45,7 @@ class _PreviewState extends State<Preview> {
           return GestureDetector(
               onTap: () {
                 context.read<Store>().addRecent(widget.id);
+                logId(widget.id.toString());
                 context.router.pushNamed('/hitomi/${widget.id}');
               },
               onLongPress: () {
