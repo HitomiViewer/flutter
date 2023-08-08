@@ -1,3 +1,5 @@
+import 'dart:math';
+
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -103,7 +105,11 @@ class Store extends ChangeNotifier {
     recent.remove(id);
     recent.insert(0, id);
     _prefs?.setStringList(
-        'recent', recent.map((e) => e.toString()).toList().sublist(0, 100));
+        'recent',
+        recent
+            .map((e) => e.toString())
+            .toList()
+            .sublist(0, min(100, recent.length)));
     notifyListeners();
   }
 }

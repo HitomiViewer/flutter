@@ -73,7 +73,6 @@ class _HitomiReaderScreenState extends State<HitomiReaderScreen> {
 
   @override
   Widget build(BuildContext context) {
-    context.read<Store>().addRecent((args?.id ?? widget.id)!);
     return Scaffold(
       appBar: widget.isFullScreen
           ? null

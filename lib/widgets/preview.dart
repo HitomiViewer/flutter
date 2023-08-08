@@ -44,6 +44,7 @@ class _PreviewState extends State<Preview> {
           bool blocked = checkBlocked(ctx, snapshot.data!['tags'] ?? []);
           return GestureDetector(
               onTap: () {
+                context.read<Store>().addRecent(widget.id);
                 context.router.pushNamed('/hitomi/${widget.id}');
               },
               onLongPress: () {

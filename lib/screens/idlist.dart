@@ -42,6 +42,7 @@ class _IdScreenState extends State<IdScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      appBar: AppBar(),
       body: Center(
           child: ListView.separated(
         controller: _controller,

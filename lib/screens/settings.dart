@@ -104,9 +104,9 @@ class _SettingScreenState extends State<SettingScreen> {
                 leading: const Icon(Icons.view_array),
                 title: const Text('Recent Viewed'),
                 description:
-                    Text('${context.watch<Store>().recent.length} items'),
+                    Text('${context.read<Store>().recent.length} items'),
                 onPressed: (context) => context.router
-                    .push(IdRoute(ids: context.watch<Store>().recent)),
+                    .push(IdRoute(ids: context.read<Store>().recent)),
               ),
             ],
           )
