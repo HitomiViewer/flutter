@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import 'package:prompt_dialog/prompt_dialog.dart';
 import 'package:provider/provider.dart';
 import 'package:settings_ui/settings_ui.dart';
+import 'package:share_plus/share_plus.dart';
 
 import '../store.dart';
 
@@ -82,6 +83,15 @@ class _SettingScreenState extends State<SettingScreen> {
                       content: Text('Copied to clipboard'),
                     ),
                   );
+                },
+              ),
+              SettingsTile(
+                leading: const Icon(Icons.share),
+                title: const Text('Share'),
+                onPressed: (context) async {
+                  final String result = json.encode(
+                      Provider.of<Store>(context, listen: false).favorite);
+                  await Share.share(result);
                 },
               ),
             ],
