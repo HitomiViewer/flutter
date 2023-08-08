@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:hitomiviewer/app_router.gr.dart';
 
+import 'favorite.dart';
 import 'hitomi.dart';
 
 GlobalKey homeScreenNavigator = GlobalKey(debugLabel: 'home_btm_nav');
@@ -21,6 +22,7 @@ class HomeScreenState extends State<HomeScreen> {
   final List<Widget> _screens = const [
     SearchScreen(),
     HitomiScreen(),
+    FavoriteScreen(),
   ];
 
   void _onTap(int index) {
@@ -44,14 +46,26 @@ class HomeScreenState extends State<HomeScreen> {
           BottomNavigationBarItem(
             icon: SvgPicture.asset(
               'assets/icons/home.svg',
+              color: Theme.of(context).colorScheme.onBackground,
             ),
             label: '홈',
           ),
           BottomNavigationBarItem(
             icon: SvgPicture.asset(
               'assets/icons/suggest.svg',
+              color: Theme.of(context).colorScheme.onBackground,
             ),
             label: '추천',
+          ),
+          BottomNavigationBarItem(
+            // icon: SvgPicture.asset(
+            //   'assets/icons/favorite.svg',
+            // ),
+            icon: Icon(
+              Icons.favorite_border,
+              color: Theme.of(context).colorScheme.onBackground,
+            ),
+            label: '즐겨찾기',
           ),
         ],
         currentIndex: _index,

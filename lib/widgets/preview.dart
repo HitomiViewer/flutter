@@ -8,7 +8,6 @@ import 'package:hitomiviewer/widgets/tag.dart';
 import 'package:provider/provider.dart';
 
 import '../screens/hitomi/detail.dart';
-import '../screens/hitomi/reader.dart';
 import '../store.dart';
 
 class Preview extends StatefulWidget {
@@ -43,7 +42,6 @@ class _PreviewState extends State<Preview> {
       builder: (context, AsyncSnapshot<Map<String, dynamic>> snapshot) {
         if (snapshot.hasData) {
           bool blocked = checkBlocked(ctx, snapshot.data!['tags'] ?? []);
-          print(blocked);
           return GestureDetector(
               onTap: () {
                 context.router.pushNamed('/hitomi/${widget.id}');

@@ -1,8 +1,6 @@
-import 'package:auto_route/auto_route.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:hitomiviewer/app_router.dart';
-import 'package:hitomiviewer/app_router.gr.dart';
 import 'package:hitomiviewer/store.dart';
 import 'package:provider/provider.dart';
 
@@ -21,6 +19,8 @@ void main() {
 
 class App extends StatelessWidget {
   final _appRouter = AppRouter();
+
+  App({super.key});
 
   @override
   Widget build(BuildContext context) {
