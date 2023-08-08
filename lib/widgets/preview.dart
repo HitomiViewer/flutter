@@ -1,5 +1,6 @@
 import 'dart:ui';
 
+import 'package:auto_route/auto_route.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:hitomiviewer/api/hitomi.dart';
@@ -45,8 +46,7 @@ class _PreviewState extends State<Preview> {
           print(blocked);
           return GestureDetector(
               onTap: () {
-                Navigator.pushNamed(context, '/hitomi/detail',
-                    arguments: HitomiReaderArguments(id: widget.id));
+                context.router.pushNamed('/hitomi/${widget.id}');
               },
               onLongPress: () {
                 showDialog(

@@ -1,9 +1,11 @@
 // ListView
 
+import 'package:auto_route/auto_route.dart';
 import 'package:flutter/material.dart';
 import 'package:hitomiviewer/store.dart';
 import 'package:provider/provider.dart';
 
+@RoutePage()
 class BlacklistScreen extends StatefulWidget {
   const BlacklistScreen({Key? key}) : super(key: key);
 

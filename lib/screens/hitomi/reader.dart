@@ -1,3 +1,4 @@
+import 'package:auto_route/auto_route.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -9,10 +10,12 @@ class HitomiReaderArguments {
   HitomiReaderArguments({required this.id});
 }
 
+@RoutePage()
 class HitomiReaderScreen extends StatefulWidget {
   final int? id;
   final bool isFullScreen;
-  const HitomiReaderScreen({Key? key, this.id, this.isFullScreen = false})
+  const HitomiReaderScreen(
+      {Key? key, @PathParam('id') required this.id, this.isFullScreen = false})
       : super(key: key);
 
   @override

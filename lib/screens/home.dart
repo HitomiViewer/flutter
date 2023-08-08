@@ -1,6 +1,7 @@
 import 'package:auto_route/auto_route.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:hitomiviewer/app_router.gr.dart';
 
 import 'hitomi.dart';
 
@@ -60,6 +61,7 @@ class HomeScreenState extends State<HomeScreen> {
   }
 }
 
+@RoutePage()
 class SearchScreen extends StatelessWidget {
   const SearchScreen({Key? key}) : super(key: key);
 
@@ -71,7 +73,7 @@ class SearchScreen extends StatelessWidget {
           IconButton(
             icon: const Icon(Icons.settings),
             onPressed: () {
-              Navigator.pushNamed(context, '/settings');
+              context.router.pushNamed('/settings');
             },
           ),
           main(context),
@@ -112,11 +114,7 @@ class SearchScreen extends StatelessWidget {
                     border: OutlineInputBorder(),
                   ),
                   onSubmitted: (String query) {
-                    Navigator.pushNamed(
-                      context,
-                      '/hitomi',
-                      arguments: HitomiScreenArguments(query: query),
-                    );
+                    context.router.push(HitomiRoute(query: query));
                   },
                 ),
               ),
