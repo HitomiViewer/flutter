@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:hitomiviewer/constants/api.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -21,7 +22,7 @@ class Tokens {
 
 Future<Tokens> signin(String id, String password) async {
   final response =
-      await http.post(Uri.https('api.toshu.me', '/auth/signin/app'), body: {
+      await http.post(Uri.https(API_HOST, '/auth/signin/app'), body: {
     'id': id,
     'password': password,
   });
@@ -41,7 +42,10 @@ Future<Tokens> signin(String id, String password) async {
 
 Future<Tokens> signup(String id, String password) async {
   final response =
-      await http.post(Uri.https('api.toshu.me', '/auth/signup/app'));
+      await http.post(Uri.https(API_HOST, '/auth/signup/app'), body: {
+    'id': id,
+    'password': password,
+  });
 
   if (response.statusCode == 201) {
     Tokens tokens = Tokens.fromJson(json.decode(response.body));
@@ -57,8 +61,7 @@ Future<Tokens> signup(String id, String password) async {
 }
 
 Future<String> refresh(String refreshToken) async {
-  final response = await http.post(
-      Uri.https('api.toshu.me', '/auth/refresh/app'),
+  final response = await http.post(Uri.https(API_HOST, '/auth/refresh/app'),
       body: {'refreshToken': refreshToken});
 
   if (response.statusCode == 201) {
@@ -93,7 +96,7 @@ class UserInfo {
 }
 
 Future<UserInfo> getUserInfo(String accessToken) async {
-  final response = await http.get(Uri.https('api.toshu.me', '/auth'), headers: {
+  final response = await http.get(Uri.https(API_HOST, '/auth'), headers: {
     'Authorization': "Bearer $accessToken",
   });
 

@@ -1,6 +1,7 @@
 import 'dart:math';
 
 import 'package:flutter/material.dart';
+import 'package:hitomiviewer/apis/auth.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class Store extends ChangeNotifier {
@@ -23,6 +24,14 @@ class Store extends ChangeNotifier {
       refreshToken = prefs.getString('refreshToken') ?? refreshToken;
 
       notifyListeners();
+    }).then((value) async {
+      try {
+        await refresh(refreshToken).then((value) {
+          setAccessToken(value);
+        });
+      } catch (e) {
+        refreshToken = '';
+      }
     });
   }
 

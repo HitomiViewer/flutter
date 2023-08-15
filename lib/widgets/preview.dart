@@ -3,10 +3,11 @@ import 'dart:ui';
 import 'package:auto_route/auto_route.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
-import 'package:hitomiviewer/api/hitomi.dart';
+import 'package:hitomiviewer/apis/hitomi.dart';
 import 'package:hitomiviewer/widgets/tag.dart';
 import 'package:provider/provider.dart';
 
+import '../constants/api.dart';
 import '../screens/hitomi/detail.dart';
 import '../store.dart';
 
@@ -71,7 +72,7 @@ class _PreviewState extends State<Preview> {
                       builder: (context) => Dialog(
                         child: CachedNetworkImage(
                           imageUrl:
-                              'https://api.toshu.me/images/preview/${snapshot.data!['files'][0]['hash']}',
+                              'https://$API_HOST/images/preview/${snapshot.data!['files'][0]['hash']}',
                         ),
                       ),
                     ),
@@ -85,7 +86,7 @@ class _PreviewState extends State<Preview> {
                         enabled: blocked,
                         child: CachedNetworkImage(
                           imageUrl:
-                              'https://api.toshu.me/images/preview/${snapshot.data!['files'][0]['hash']}',
+                              'https://$API_HOST/images/preview/${snapshot.data!['files'][0]['hash']}',
                           imageBuilder: (context, imageProvider) => Container(
                             width: 100,
                             height: 100,

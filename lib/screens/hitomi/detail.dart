@@ -2,11 +2,10 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_expandable_fab/flutter_expandable_fab.dart';
-import 'package:hitomiviewer/screens/hitomi.dart';
 import 'package:provider/provider.dart';
-import 'package:scroll_to_index/scroll_to_index.dart';
 import 'package:share_plus/share_plus.dart';
 
+import '../../constants/api.dart';
 import '../../store.dart';
 import '../../widgets/preview.dart';
 import '../../widgets/tag.dart';
@@ -46,7 +45,7 @@ class _HitomiDetailScreenState extends State<HitomiDetailScreen> {
                           child: GestureDetector(
                             child: CachedNetworkImage(
                               imageUrl:
-                                  'https://api.toshu.me/images/webp/${widget.detail['files'][0]['hash']}',
+                                  'https://$API_HOST/images/webp/${widget.detail['files'][0]['hash']}',
                             ),
                             onTap: () => showDialog(
                               context: context,

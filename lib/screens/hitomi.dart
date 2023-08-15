@@ -1,7 +1,7 @@
 import 'package:auto_route/auto_route.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_expandable_fab/flutter_expandable_fab.dart';
-import 'package:hitomiviewer/api/hitomi.dart';
+import 'package:hitomiviewer/apis/hitomi.dart';
 import 'package:hitomiviewer/store.dart';
 import 'package:prompt_dialog/prompt_dialog.dart';
 import 'package:provider/provider.dart';
@@ -27,7 +27,7 @@ class HitomiScreen extends StatefulWidget {
 class _HitomiScreenState extends State<HitomiScreen> {
   late Future<List<int>> galleries;
 
-  AutoScrollController _controller = AutoScrollController();
+  final AutoScrollController _controller = AutoScrollController();
 
   get hasQuery => widget.query != null && widget.query != '';
   get query => widget.query;

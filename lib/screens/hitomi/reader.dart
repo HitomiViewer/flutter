@@ -2,9 +2,8 @@ import 'package:auto_route/auto_route.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:hitomiviewer/api/hitomi.dart';
-import 'package:hitomiviewer/store.dart';
-import 'package:provider/provider.dart';
+import 'package:hitomiviewer/apis/hitomi.dart';
+import 'package:hitomiviewer/constants/api.dart';
 
 class HitomiReaderArguments {
   final int id;
@@ -129,7 +128,7 @@ class _HitomiReaderScreenState extends State<HitomiReaderScreen> {
                             placeholder: (context, url) =>
                                 const CircularProgressIndicator(),
                             imageUrl:
-                                'https://api.toshu.me/images/webp/${snapshot.data!['files'][i]['hash']}',
+                                'https://$API_HOST/images/webp/${snapshot.data!['files'][i]['hash']}',
                             filterQuality: FilterQuality.high,
                           ),
                         ),

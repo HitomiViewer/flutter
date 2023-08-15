@@ -1,7 +1,6 @@
 import 'package:auto_route/auto_route.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/widgets.dart';
-import 'package:hitomiviewer/api/auth.dart';
+import 'package:hitomiviewer/apis/auth.dart';
 import 'package:hitomiviewer/store.dart';
 import 'package:provider/provider.dart';
 
@@ -9,6 +8,8 @@ import 'package:provider/provider.dart';
 class InfoScreen extends StatefulWidget {
   static const String id = 'login_screen';
   final String title = 'Login';
+
+  const InfoScreen({super.key});
 
   @override
   _InfoScreenState createState() => _InfoScreenState();
