@@ -51,7 +51,7 @@ class _HitomiDetailScreenState extends State<HitomiDetailScreen> {
                               context: context,
                               builder: (context) => Dialog(
                                 child: HitomiReaderScreen(
-                                  id: int.parse(widget.detail['id']),
+                                  id: int.parse(widget.detail['id'].toString()),
                                 ),
                               ),
                             ),
@@ -119,17 +119,20 @@ class _HitomiDetailScreenState extends State<HitomiDetailScreen> {
                               ),
                               IconButton(
                                 icon: context.read<Store>().containsFavorite(
-                                        int.parse(widget.detail['id']))
+                                        int.parse(
+                                            widget.detail['id'].toString()))
                                     ? const Icon(Icons.favorite)
                                     : const Icon(Icons.favorite_border),
                                 onPressed: () {
                                   if (context.read<Store>().containsFavorite(
-                                      int.parse(widget.detail['id']))) {
+                                      int.parse(
+                                          widget.detail['id'].toString()))) {
                                     context.read<Store>().removeFavorite(
-                                        int.parse(widget.detail['id']));
+                                        int.parse(
+                                            widget.detail['id'].toString()));
                                   } else {
-                                    context.read<Store>().addFavorite(
-                                        int.parse(widget.detail['id']));
+                                    context.read<Store>().addFavorite(int.parse(
+                                        widget.detail['id'].toString()));
                                   }
                                   setState(() {});
                                 },
@@ -189,13 +192,13 @@ class _HitomiDetailScreenState extends State<HitomiDetailScreen> {
             heroTag: null,
             child: context
                     .read<Store>()
-                    .containsFavorite(int.parse(widget.detail['id']))
+                    .containsFavorite(int.parse(widget.detail['id'].toString()))
                 ? const Icon(Icons.favorite)
                 : const Icon(Icons.favorite_border),
             onPressed: () {
               context
                   .read<Store>()
-                  .toggleFavorite(int.parse(widget.detail['id']));
+                  .toggleFavorite(int.parse(widget.detail['id'].toString()));
               setState(() {});
             },
           ),
