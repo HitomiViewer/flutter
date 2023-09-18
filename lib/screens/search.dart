@@ -52,15 +52,15 @@ class SearchScreen extends StatelessWidget {
                 constraints: const BoxConstraints(
                   minWidth: 240,
                 ),
-                // child: TextField(
-                //   decoration: const InputDecoration(
-                //     border: OutlineInputBorder(),
-                //   ),
-                //   onSubmitted: (String query) {
-                //     context.router.push(HitomiRoute(query: query));
-                //   },
-                // ),
-                child: const HitomiAutocomplete(),
+                child: TextField(
+                  decoration: const InputDecoration(
+                    border: OutlineInputBorder(),
+                  ),
+                  onSubmitted: (String query) {
+                    context.router.push(HitomiRoute(query: query));
+                  },
+                ),
+                // child: const HitomiAutocomplete(),
               ),
             ),
           ),
