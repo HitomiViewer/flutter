@@ -19,10 +19,10 @@ class HomeScreen extends StatefulWidget {
 class HomeScreenState extends State<HomeScreen> {
   int _index = 0;
 
-  final List<Widget> _screens = const [
+  final List<Widget> _screens = [
     SearchScreen(),
-    HitomiScreen(),
-    FavoriteScreen(),
+    const HitomiScreen(),
+    const FavoriteScreen(),
   ];
 
   void _onTap(int index) {

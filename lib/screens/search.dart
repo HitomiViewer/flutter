@@ -6,7 +6,9 @@ import '../app_router.gr.dart';
 
 @RoutePage()
 class SearchScreen extends StatelessWidget {
-  const SearchScreen({Key? key}) : super(key: key);
+  SearchScreen({Key? key}) : super(key: key);
+
+  final TextEditingController _controller = TextEditingController();
 
   @override
   Widget build(BuildContext context) {
@@ -21,6 +23,53 @@ class SearchScreen extends StatelessWidget {
           ),
           main(context),
         ],
+      ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: () {
+          showDialog(
+            context: context,
+            builder: (BuildContext context) {
+              return AlertDialog(
+                title: const Text('검색어를 입력해주세요'),
+                content: TextField(
+                  decoration: const InputDecoration(
+                    border: OutlineInputBorder(),
+                  ),
+                  onSubmitted: (String query) {
+                    autocomplete(query).then((value) {
+                      showDialog(
+                        context: context,
+                        builder: (BuildContext context) {
+                          return AlertDialog(
+                            title: const Text('검색 결과'),
+                            content: SizedBox(
+                              width: double.maxFinite,
+                              child: ListView.builder(
+                                shrinkWrap: true,
+                                itemCount: value.length,
+                                itemBuilder: (BuildContext context, int index) {
+                                  return ListTile(
+                                    title: Text(value[index].toString()),
+                                    onTap: () {
+                                      _controller.text += " ${value[index]}";
+                                      Navigator.pop(context);
+                                      Navigator.pop(context);
+                                    },
+                                  );
+                                },
+                              ),
+                            ),
+                          );
+                        },
+                      );
+                    });
+                  },
+                ),
+              );
+            },
+          );
+        },
+        child: const Icon(Icons.search),
       ),
     );
   }
@@ -53,6 +102,7 @@ class SearchScreen extends StatelessWidget {
                   minWidth: 240,
                 ),
                 child: TextField(
+                  controller: _controller,
                   decoration: const InputDecoration(
                     border: OutlineInputBorder(),
                   ),
@@ -81,7 +131,7 @@ class HitomiAutocomplete extends StatelessWidget {
           return const Iterable<String>.empty();
         }
         return autocomplete(textEditingValue.text.toLowerCase()).then((value) {
-          return value.map((e) => "${e.ns}:${e.tag}").toList();
+          return value.map((e) => e.toString()).toList();
         });
       },
       onSelected: (String selection) {

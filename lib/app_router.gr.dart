@@ -105,9 +105,11 @@ abstract class $AppRouter extends _i12.RootStackRouter {
       );
     },
     SearchRoute.name: (routeData) {
+      final args = routeData.argsAs<SearchRouteArgs>(
+          orElse: () => const SearchRouteArgs());
       return _i12.AutoRoutePage<dynamic>(
         routeData: routeData,
-        child: const _i11.SearchScreen(),
+        child: _i11.SearchScreen(key: args.key),
       );
     },
   };
@@ -338,14 +340,29 @@ class InfoRoute extends _i12.PageRouteInfo<void> {
 
 /// generated route for
 /// [_i11.SearchScreen]
-class SearchRoute extends _i12.PageRouteInfo<void> {
-  const SearchRoute({List<_i12.PageRouteInfo>? children})
-      : super(
+class SearchRoute extends _i12.PageRouteInfo<SearchRouteArgs> {
+  SearchRoute({
+    _i13.Key? key,
+    List<_i12.PageRouteInfo>? children,
+  }) : super(
           SearchRoute.name,
+          args: SearchRouteArgs(key: key),
           initialChildren: children,
         );
 
   static const String name = 'SearchRoute';
 
-  static const _i12.PageInfo<void> page = _i12.PageInfo<void>(name);
+  static const _i12.PageInfo<SearchRouteArgs> page =
+      _i12.PageInfo<SearchRouteArgs>(name);
+}
+
+class SearchRouteArgs {
+  const SearchRouteArgs({this.key});
+
+  final _i13.Key? key;
+
+  @override
+  String toString() {
+    return 'SearchRouteArgs{key: $key}';
+  }
 }

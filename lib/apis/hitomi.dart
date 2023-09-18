@@ -65,6 +65,11 @@ class TagInfo {
       ns: json['ns'],
     );
   }
+
+  @override
+  String toString() {
+    return '$ns:${tag.replaceAll(' ', '_')}';
+  }
 }
 
 Future<List<TagInfo>> autocomplete(query) async {
