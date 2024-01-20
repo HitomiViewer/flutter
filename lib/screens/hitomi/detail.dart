@@ -31,7 +31,6 @@ class _HitomiDetailScreenState extends State<HitomiDetailScreen> {
           child: Column(
             children: [
               SizedBox(
-                height: constraints.maxHeight,
                 width: constraints.maxWidth,
                 child: Column(
                   children: [
@@ -155,6 +154,7 @@ class _HitomiDetailScreenState extends State<HitomiDetailScreen> {
                     const EdgeInsets.symmetric(vertical: 32, horizontal: 20),
                 separatorBuilder: (context, index) =>
                     const SizedBox(height: 10),
+                physics: const NeverScrollableScrollPhysics(),
               ),
             ],
           ),
