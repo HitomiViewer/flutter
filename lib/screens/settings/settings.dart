@@ -3,15 +3,15 @@ import 'dart:convert';
 import 'package:auto_route/auto_route.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:hitomiviewer/apis/favorite.dart';
+import 'package:hitomiviewer/services/favorite.dart';
 import 'package:hitomiviewer/app_router.gr.dart';
 import 'package:prompt_dialog/prompt_dialog.dart';
 import 'package:provider/provider.dart';
 import 'package:settings_ui/settings_ui.dart';
 import 'package:share_plus/share_plus.dart';
 
-import '../apis/auth.dart';
-import '../store.dart';
+import '../../services/auth.dart';
+import '../../store.dart';
 
 @RoutePage()
 class SettingScreen extends StatefulWidget {

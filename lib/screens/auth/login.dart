@@ -1,6 +1,6 @@
 import 'package:auto_route/auto_route.dart';
 import 'package:flutter/material.dart';
-import 'package:hitomiviewer/apis/auth.dart';
+import 'package:hitomiviewer/services/auth.dart';
 import 'package:hitomiviewer/store.dart';
 import 'package:provider/provider.dart';
 

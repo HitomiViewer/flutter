@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:hitomiviewer/store.dart';
 import 'package:provider/provider.dart';
 
-import '../widgets/preview.dart';
+import '../../widgets/preview.dart';
 
 @RoutePage()
 class FavoriteScreen extends StatefulWidget {

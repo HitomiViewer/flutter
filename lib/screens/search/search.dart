@@ -1,8 +1,8 @@
 import 'package:auto_route/auto_route.dart';
 import 'package:flutter/material.dart';
-import 'package:hitomiviewer/apis/hitomi.dart';
+import 'package:hitomiviewer/services/hitomi.dart';
 
-import '../app_router.gr.dart';
+import '../../app_router.gr.dart';
 
 @RoutePage()
 class SearchScreen extends StatelessWidget {

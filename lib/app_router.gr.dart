@@ -10,27 +10,33 @@
 // ignore_for_file: no_leading_underscores_for_library_prefixes
 import 'package:auto_route/auto_route.dart' as _i12;
 import 'package:flutter/material.dart' as _i13;
-import 'package:hitomiviewer/screens/auth/info.dart' as _i10;
+import 'package:hitomiviewer/screens/auth/info.dart' as _i7;
 import 'package:hitomiviewer/screens/auth/login.dart' as _i8;
 import 'package:hitomiviewer/screens/auth/register.dart' as _i9;
-import 'package:hitomiviewer/screens/favorite.dart' as _i1;
-import 'package:hitomiviewer/screens/hitomi.dart' as _i3;
-import 'package:hitomiviewer/screens/hitomi/reader.dart' as _i2;
-import 'package:hitomiviewer/screens/home.dart' as _i4;
-import 'package:hitomiviewer/screens/idlist.dart' as _i5;
-import 'package:hitomiviewer/screens/search.dart' as _i11;
-import 'package:hitomiviewer/screens/settings.dart' as _i7;
-import 'package:hitomiviewer/screens/settings/blacklist.dart' as _i6;
+import 'package:hitomiviewer/screens/favorite/favorite.dart' as _i2;
+import 'package:hitomiviewer/screens/hitomi/hitomi.dart' as _i4;
+import 'package:hitomiviewer/screens/hitomi/reader.dart' as _i3;
+import 'package:hitomiviewer/screens/home/home.dart' as _i5;
+import 'package:hitomiviewer/screens/search/search.dart' as _i10;
+import 'package:hitomiviewer/screens/settings/blacklist.dart' as _i1;
+import 'package:hitomiviewer/screens/settings/settings.dart' as _i11;
+import 'package:hitomiviewer/screens/view/idlist.dart' as _i6;
 
 abstract class $AppRouter extends _i12.RootStackRouter {
   $AppRouter({super.navigatorKey});
 
   @override
   final Map<String, _i12.PageFactory> pagesMap = {
+    BlacklistRoute.name: (routeData) {
+      return _i12.AutoRoutePage<dynamic>(
+        routeData: routeData,
+        child: const _i1.BlacklistScreen(),
+      );
+    },
     FavoriteRoute.name: (routeData) {
       return _i12.AutoRoutePage<dynamic>(
         routeData: routeData,
-        child: const _i1.FavoriteScreen(),
+        child: const _i2.FavoriteScreen(),
       );
     },
     HitomiReaderRoute.name: (routeData) {
@@ -39,7 +45,7 @@ abstract class $AppRouter extends _i12.RootStackRouter {
           orElse: () => HitomiReaderRouteArgs(id: pathParams.optInt('id')));
       return _i12.AutoRoutePage<dynamic>(
         routeData: routeData,
-        child: _i2.HitomiReaderScreen(
+        child: _i3.HitomiReaderScreen(
           key: args.key,
           id: args.id,
           isFullScreen: args.isFullScreen,
@@ -52,7 +58,7 @@ abstract class $AppRouter extends _i12.RootStackRouter {
           orElse: () => const HitomiRouteArgs());
       return _i12.AutoRoutePage<dynamic>(
         routeData: routeData,
-        child: _i3.HitomiScreen(
+        child: _i4.HitomiScreen(
           key: args.key,
           query: args.query,
         ),
@@ -61,29 +67,23 @@ abstract class $AppRouter extends _i12.RootStackRouter {
     HomeRoute.name: (routeData) {
       return _i12.AutoRoutePage<dynamic>(
         routeData: routeData,
-        child: const _i4.HomeScreen(),
+        child: const _i5.HomeScreen(),
       );
     },
     IdRoute.name: (routeData) {
       final args = routeData.argsAs<IdRouteArgs>();
       return _i12.AutoRoutePage<dynamic>(
         routeData: routeData,
-        child: _i5.IdScreen(
+        child: _i6.IdScreen(
           key: args.key,
           ids: args.ids,
         ),
       );
     },
-    BlacklistRoute.name: (routeData) {
+    InfoRoute.name: (routeData) {
       return _i12.AutoRoutePage<dynamic>(
         routeData: routeData,
-        child: const _i6.BlacklistScreen(),
-      );
-    },
-    SettingRoute.name: (routeData) {
-      return _i12.AutoRoutePage<dynamic>(
-        routeData: routeData,
-        child: const _i7.SettingScreen(),
+        child: const _i7.InfoScreen(),
       );
     },
     LoginRoute.name: (routeData) {
@@ -98,25 +98,39 @@ abstract class $AppRouter extends _i12.RootStackRouter {
         child: const _i9.RegisterScreen(),
       );
     },
-    InfoRoute.name: (routeData) {
-      return _i12.AutoRoutePage<dynamic>(
-        routeData: routeData,
-        child: const _i10.InfoScreen(),
-      );
-    },
     SearchRoute.name: (routeData) {
       final args = routeData.argsAs<SearchRouteArgs>(
           orElse: () => const SearchRouteArgs());
       return _i12.AutoRoutePage<dynamic>(
         routeData: routeData,
-        child: _i11.SearchScreen(key: args.key),
+        child: _i10.SearchScreen(key: args.key),
+      );
+    },
+    SettingRoute.name: (routeData) {
+      return _i12.AutoRoutePage<dynamic>(
+        routeData: routeData,
+        child: const _i11.SettingScreen(),
       );
     },
   };
 }
 
 /// generated route for
-/// [_i1.FavoriteScreen]
+/// [_i1.BlacklistScreen]
+class BlacklistRoute extends _i12.PageRouteInfo<void> {
+  const BlacklistRoute({List<_i12.PageRouteInfo>? children})
+      : super(
+          BlacklistRoute.name,
+          initialChildren: children,
+        );
+
+  static const String name = 'BlacklistRoute';
+
+  static const _i12.PageInfo<void> page = _i12.PageInfo<void>(name);
+}
+
+/// generated route for
+/// [_i2.FavoriteScreen]
 class FavoriteRoute extends _i12.PageRouteInfo<void> {
   const FavoriteRoute({List<_i12.PageRouteInfo>? children})
       : super(
@@ -130,7 +144,7 @@ class FavoriteRoute extends _i12.PageRouteInfo<void> {
 }
 
 /// generated route for
-/// [_i2.HitomiReaderScreen]
+/// [_i3.HitomiReaderScreen]
 class HitomiReaderRoute extends _i12.PageRouteInfo<HitomiReaderRouteArgs> {
   HitomiReaderRoute({
     _i13.Key? key,
@@ -179,7 +193,7 @@ class HitomiReaderRouteArgs {
 }
 
 /// generated route for
-/// [_i3.HitomiScreen]
+/// [_i4.HitomiScreen]
 class HitomiRoute extends _i12.PageRouteInfo<HitomiRouteArgs> {
   HitomiRoute({
     _i13.Key? key,
@@ -217,7 +231,7 @@ class HitomiRouteArgs {
 }
 
 /// generated route for
-/// [_i4.HomeScreen]
+/// [_i5.HomeScreen]
 class HomeRoute extends _i12.PageRouteInfo<void> {
   const HomeRoute({List<_i12.PageRouteInfo>? children})
       : super(
@@ -231,7 +245,7 @@ class HomeRoute extends _i12.PageRouteInfo<void> {
 }
 
 /// generated route for
-/// [_i5.IdScreen]
+/// [_i6.IdScreen]
 class IdRoute extends _i12.PageRouteInfo<IdRouteArgs> {
   IdRoute({
     _i13.Key? key,
@@ -269,29 +283,15 @@ class IdRouteArgs {
 }
 
 /// generated route for
-/// [_i6.BlacklistScreen]
-class BlacklistRoute extends _i12.PageRouteInfo<void> {
-  const BlacklistRoute({List<_i12.PageRouteInfo>? children})
+/// [_i7.InfoScreen]
+class InfoRoute extends _i12.PageRouteInfo<void> {
+  const InfoRoute({List<_i12.PageRouteInfo>? children})
       : super(
-          BlacklistRoute.name,
+          InfoRoute.name,
           initialChildren: children,
         );
 
-  static const String name = 'BlacklistRoute';
-
-  static const _i12.PageInfo<void> page = _i12.PageInfo<void>(name);
-}
-
-/// generated route for
-/// [_i7.SettingScreen]
-class SettingRoute extends _i12.PageRouteInfo<void> {
-  const SettingRoute({List<_i12.PageRouteInfo>? children})
-      : super(
-          SettingRoute.name,
-          initialChildren: children,
-        );
-
-  static const String name = 'SettingRoute';
+  static const String name = 'InfoRoute';
 
   static const _i12.PageInfo<void> page = _i12.PageInfo<void>(name);
 }
@@ -325,21 +325,7 @@ class RegisterRoute extends _i12.PageRouteInfo<void> {
 }
 
 /// generated route for
-/// [_i10.InfoScreen]
-class InfoRoute extends _i12.PageRouteInfo<void> {
-  const InfoRoute({List<_i12.PageRouteInfo>? children})
-      : super(
-          InfoRoute.name,
-          initialChildren: children,
-        );
-
-  static const String name = 'InfoRoute';
-
-  static const _i12.PageInfo<void> page = _i12.PageInfo<void>(name);
-}
-
-/// generated route for
-/// [_i11.SearchScreen]
+/// [_i10.SearchScreen]
 class SearchRoute extends _i12.PageRouteInfo<SearchRouteArgs> {
   SearchRoute({
     _i13.Key? key,
@@ -365,4 +351,18 @@ class SearchRouteArgs {
   String toString() {
     return 'SearchRouteArgs{key: $key}';
   }
+}
+
+/// generated route for
+/// [_i11.SettingScreen]
+class SettingRoute extends _i12.PageRouteInfo<void> {
+  const SettingRoute({List<_i12.PageRouteInfo>? children})
+      : super(
+          SettingRoute.name,
+          initialChildren: children,
+        );
+
+  static const String name = 'SettingRoute';
+
+  static const _i12.PageInfo<void> page = _i12.PageInfo<void>(name);
 }

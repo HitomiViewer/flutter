@@ -2,9 +2,9 @@ import 'package:auto_route/auto_route.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
-import 'favorite.dart';
-import 'hitomi.dart';
-import 'search.dart';
+import '../favorite/favorite.dart';
+import '../hitomi/hitomi.dart';
+import '../search/search.dart';
 
 GlobalKey homeScreenNavigator = GlobalKey(debugLabel: 'home_btm_nav');
 

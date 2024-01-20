@@ -2,7 +2,7 @@ import 'package:auto_route/auto_route.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:hitomiviewer/apis/hitomi.dart';
+import 'package:hitomiviewer/services/hitomi.dart';
 import 'package:hitomiviewer/constants/api.dart';
 
 class HitomiReaderArguments {

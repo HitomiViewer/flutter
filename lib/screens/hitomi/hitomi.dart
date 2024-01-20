@@ -1,13 +1,13 @@
 import 'package:auto_route/auto_route.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_expandable_fab/flutter_expandable_fab.dart';
-import 'package:hitomiviewer/apis/hitomi.dart';
+import 'package:hitomiviewer/services/hitomi.dart';
 import 'package:hitomiviewer/store.dart';
 import 'package:prompt_dialog/prompt_dialog.dart';
 import 'package:provider/provider.dart';
 import 'package:scroll_to_index/scroll_to_index.dart';
 
-import '../widgets/preview.dart';
+import '../../widgets/preview.dart';
 
 class HitomiScreenArguments {
   final String? query;

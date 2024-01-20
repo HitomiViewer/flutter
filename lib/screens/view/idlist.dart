@@ -4,7 +4,7 @@ import 'package:flutter_expandable_fab/flutter_expandable_fab.dart';
 import 'package:prompt_dialog/prompt_dialog.dart';
 import 'package:scroll_to_index/scroll_to_index.dart';
 
-import '../widgets/preview.dart';
+import '../../widgets/preview.dart';
 
 class IdScreenArguments {
   final List<int> ids;
