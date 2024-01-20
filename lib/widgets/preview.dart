@@ -72,7 +72,7 @@ class _PreviewState extends State<Preview> {
                       builder: (context) => Dialog(
                         child: CachedNetworkImage(
                           imageUrl:
-                              'https://$API_HOST/images/preview/${snapshot.data!['files'][0]['hash']}',
+                              'https://$API_HOST/v2/images/preview/${snapshot.data!['files'][0]['hash']}.webp',
                         ),
                       ),
                     ),
@@ -86,7 +86,7 @@ class _PreviewState extends State<Preview> {
                         enabled: blocked,
                         child: CachedNetworkImage(
                           imageUrl:
-                              'https://$API_HOST/images/preview/${snapshot.data!['files'][0]['hash']}',
+                              'https://$API_HOST/v2/images/preview/${snapshot.data!['files'][0]['hash']}.webp',
                           imageBuilder: (context, imageProvider) => Container(
                             width: 100,
                             height: 100,
