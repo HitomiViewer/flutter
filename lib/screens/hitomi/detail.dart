@@ -44,7 +44,7 @@ class _HitomiDetailScreenState extends State<HitomiDetailScreen> {
                           child: GestureDetector(
                             child: CachedNetworkImage(
                               imageUrl:
-                                  'https://$API_HOST/v2/images/${widget.detail['files'][0]['hash']}.webp',
+                                  'https://$API_HOST/api/hitomi/images/${widget.detail['files'][0]['hash']}.webp',
                             ),
                             onTap: () => showDialog(
                               context: context,

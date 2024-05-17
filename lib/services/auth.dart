@@ -21,13 +21,13 @@ class Tokens {
 }
 
 Future<Tokens> signin(String id, String password) async {
-  final response =
-      await http.post(Uri.https(API_HOST, '/auth/signin/app'), body: {
-    'id': id,
-    'password': password,
-  });
+  final response = await http.post(Uri.https(API_HOST, '/api/auth/signin'),
+      body: json.encode({
+        'id': id,
+        'password': password,
+      }));
 
-  if (response.statusCode == 201) {
+  if (response.statusCode == 200) {
     Tokens tokens = Tokens.fromJson(json.decode(response.body));
     _prefs ??= await SharedPreferences.getInstance();
     _prefs?.setString('refreshToken', tokens.refreshToken);
@@ -42,12 +42,12 @@ Future<Tokens> signin(String id, String password) async {
 
 Future<Tokens> signup(String id, String password) async {
   final response =
-      await http.post(Uri.https(API_HOST, '/auth/signup/app'), body: {
+      await http.post(Uri.https(API_HOST, '/api/auth/signup'), body: {
     'id': id,
     'password': password,
   });
 
-  if (response.statusCode == 201) {
+  if (response.statusCode == 200) {
     Tokens tokens = Tokens.fromJson(json.decode(response.body));
     _prefs ??= await SharedPreferences.getInstance();
     _prefs?.setString('refreshToken', tokens.refreshToken);
@@ -61,10 +61,10 @@ Future<Tokens> signup(String id, String password) async {
 }
 
 Future<String> refresh(String refreshToken) async {
-  final response = await http.post(Uri.https(API_HOST, '/auth/refresh/app'),
-      body: {'refreshToken': refreshToken});
+  final response = await http.post(Uri.https(API_HOST, '/api/auth/refresh'),
+      body: json.encode({'refreshToken': refreshToken}));
 
-  if (response.statusCode == 201) {
+  if (response.statusCode == 200) {
     return response.body;
   } else if (response.statusCode == 401) {
     throw Exception('Invalid refresh token');
@@ -96,7 +96,7 @@ class UserInfo {
 }
 
 Future<UserInfo> getUserInfo(String accessToken) async {
-  final response = await http.get(Uri.https(API_HOST, '/auth'), headers: {
+  final response = await http.get(Uri.https(API_HOST, '/api/auth'), headers: {
     'Authorization': "Bearer $accessToken",
   });
 

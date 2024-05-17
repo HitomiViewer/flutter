@@ -5,7 +5,8 @@ import 'package:http/http.dart' as http;
 import '../constants/api.dart';
 
 Future<Map<String, dynamic>> fetchDetail(String id) async {
-  final response = await http.get(Uri.https(API_HOST, '/detail/$id'));
+  final response =
+      await http.get(Uri.https(API_HOST, '/api/hitomi/detail/$id'));
 
   if (response.statusCode == 200) {
     // 만약 서버가 OK 응답을 반환하면, JSON을 파싱합니다.
@@ -17,7 +18,7 @@ Future<Map<String, dynamic>> fetchDetail(String id) async {
 }
 
 Future<List<int>> fetchPost([String? language]) async {
-  final response = await http.get(Uri.https(API_HOST, '', {
+  final response = await http.get(Uri.https(API_HOST, '/api/hitomi', {
     language == null ? '' : 'language': language,
   }));
 
@@ -31,7 +32,7 @@ Future<List<int>> fetchPost([String? language]) async {
 }
 
 Future<List<int>> searchGallery(query, [String? language]) async {
-  final response = await http.get(Uri.https(API_HOST, '/search', {
+  final response = await http.get(Uri.https(API_HOST, '/api/hitomi', {
     'query': query,
     language == null ? '' : 'language': language,
   }));
@@ -73,7 +74,7 @@ class TagInfo {
 }
 
 Future<List<TagInfo>> autocomplete(query) async {
-  final response = await http.get(Uri.https(API_HOST, '/search/suggest', {
+  final response = await http.get(Uri.https(API_HOST, '/api/hitomi/suggest', {
     'query': query,
   }));
 
@@ -91,5 +92,5 @@ Future<List<TagInfo>> autocomplete(query) async {
 }
 
 Future<void> logId(String id) async {
-  await http.get(Uri.https(API_HOST, '/log/$id'));
+  // await http.get(Uri.https(API_HOST, '/log/$id'));
 }

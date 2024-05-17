@@ -1,1 +1,1 @@
-String API_HOST = 'api.toshu.me';
+String API_HOST = 'toshu-vercel.vercel.app';

@@ -128,7 +128,7 @@ class _HitomiReaderScreenState extends State<HitomiReaderScreen> {
                             placeholder: (context, url) =>
                                 const CircularProgressIndicator(),
                             imageUrl:
-                                'https://$API_HOST/v2/images/${snapshot.data!['files'][i]['hash']}.webp',
+                                'https://$API_HOST/api/hitomi/images/${snapshot.data!['files'][i]['hash']}.webp',
                             filterQuality: FilterQuality.high,
                           ),
                         ),
