@@ -6,7 +6,7 @@ import '../constants/api.dart';
 
 Future<List<int>> getFavorites(String accessToken) async {
   final response =
-      await http.get(Uri.https(API_HOST, '/user/favorite'), headers: {
+      await http.get(Uri.https(API_HOST, '/api/hitomi/favorite'), headers: {
     'Authorization': "Bearer $accessToken",
   });
 
@@ -22,7 +22,7 @@ Future<List<int>> getFavorites(String accessToken) async {
 }
 
 Future<void> setFavorites(String accessToken, List<int> favorites) async {
-  final response = await http.post(Uri.https(API_HOST, '/user/favorite'),
+  final response = await http.post(Uri.https(API_HOST, '/api/hitomi/favorite'),
       headers: {
         'Authorization': "Bearer $accessToken",
         'Content-type': 'application/json',
