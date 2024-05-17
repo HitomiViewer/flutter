@@ -6,14 +6,12 @@ import '../constants/api.dart';
 
 Future<List<int>> getFavorites(String accessToken) async {
   final response =
-      await http.get(Uri.https(API_HOST, '/api/hitomi/favorite'), headers: {
+      await http.get(Uri.https(API_HOST, '/api/userdata'), headers: {
     'Authorization': "Bearer $accessToken",
   });
 
   if (response.statusCode == 200) {
-    return List<String>.from(json.decode(response.body)['favorites'])
-        .map((e) => int.parse(e))
-        .toList();
+    return List<int>.from(json.decode(response.body)['favorites']).toList();
   } else if (response.statusCode == 401) {
     throw Exception('Access token expired');
   } else {
@@ -22,7 +20,7 @@ Future<List<int>> getFavorites(String accessToken) async {
 }
 
 Future<void> setFavorites(String accessToken, List<int> favorites) async {
-  final response = await http.post(Uri.https(API_HOST, '/api/hitomi/favorite'),
+  final response = await http.post(Uri.https(API_HOST, '/api/userdata'),
       headers: {
         'Authorization': "Bearer $accessToken",
         'Content-type': 'application/json',
