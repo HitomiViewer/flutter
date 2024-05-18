@@ -47,6 +47,10 @@ jobs:
           name: web
           path: build/web
           retention-days: 5
+      - name: Deploy GitHub Pages site
+        uses: actions/deploy-pages@v4.0.5
+        with:
+          artifact_name: web
 
   linux-build:
     runs-on: ubuntu-latest
