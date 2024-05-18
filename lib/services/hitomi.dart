@@ -10,7 +10,7 @@ Future<Map<String, dynamic>> fetchDetail(String id) async {
 
   if (response.statusCode == 200) {
     // 만약 서버가 OK 응답을 반환하면, JSON을 파싱합니다.
-    return json.decode(response.body);
+    return json.decode(utf8.decode(response.bodyBytes));
   } else {
     // 만약 응답이 OK가 아니면, 에러를 던집니다.
     throw Exception('Failed to load post');
@@ -82,7 +82,9 @@ Future<List<TagInfo>> autocomplete(query) async {
     print(response.body);
     // 만약 서버가 OK 응답을 반환하면, JSON을 파싱합니다.
     return json
-        .decode(response.body)
+        .decode(
+          utf8.decode(response.bodyBytes),
+        )
         .map<TagInfo>((e) => TagInfo.fromJson(e))
         .toList();
   } else {
