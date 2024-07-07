@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:hitomiviewer/services/hitomi.dart';
 import 'package:hitomiviewer/constants/api.dart';
+import 'package:hitomiviewer/widgets/zoomable_image.dart';
 
 class HitomiReaderArguments {
   final int id;
@@ -34,6 +35,10 @@ class _HitomiReaderScreenState extends State<HitomiReaderScreen> {
   late final PageController _controller = PageController(
     initialPage: widget.initialPage,
   );
+  final TransformationController _transformationController =
+      TransformationController();
+
+  double correctScaleValue = 1.0;
 
   final FocusNode _focusNode = FocusNode();
 
@@ -124,16 +129,9 @@ class _HitomiReaderScreenState extends State<HitomiReaderScreen> {
                     Stack(
                       children: [
                         Center(
-                          child: CachedNetworkImage(
-                            placeholder: (context, url) =>
-                                const CircularProgressIndicator(),
+                          child: ZoomableImage(
                             imageUrl:
                                 'https://$API_HOST/api/hitomi/images/${snapshot.data!['files'][i]['hash']}.webp',
-                            filterQuality: FilterQuality.high,
-                            memCacheHeight: MediaQuery.of(context)
-                                .size
-                                .height
-                                .toInt(), // cache image with height of screen
                           ),
                         ),
                         Positioned(

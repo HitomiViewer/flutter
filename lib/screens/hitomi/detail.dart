@@ -173,11 +173,11 @@ class _HitomiDetailScreenState extends State<HitomiDetailScreen> {
             child: const Icon(Icons.share),
             onPressed: () {
               try {
-                Share.share('https://toshu.me/#/hitomi/${widget.detail['id']}');
+                Share.share('https://hitomiviewer.pages.dev/#/hitomi/${widget.detail['id']}');
               } catch (e) {
                 Clipboard.setData(
                   ClipboardData(
-                    text: 'https://toshu.me/#/hitomi/${widget.detail['id']}',
+                    text: 'https://hitomiviewer.pages.dev/#/hitomi/${widget.detail['id']}',
                   ),
                 );
                 ScaffoldMessenger.of(context).showSnackBar(
