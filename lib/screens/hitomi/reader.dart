@@ -130,6 +130,10 @@ class _HitomiReaderScreenState extends State<HitomiReaderScreen> {
                             imageUrl:
                                 'https://$API_HOST/api/hitomi/images/${snapshot.data!['files'][i]['hash']}.webp',
                             filterQuality: FilterQuality.high,
+                            memCacheHeight: MediaQuery.of(context)
+                                .size
+                                .height
+                                .toInt(), // cache image with height of screen
                           ),
                         ),
                         Positioned(
