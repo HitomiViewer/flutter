@@ -19,18 +19,18 @@ Future<Map<String, dynamic>> fetchDetail(String id) async {
   }
 }
 
-Future<Tuple2<List<int>, DateTime>> fetchPost([String? language]) async {
+Future<Tuple2<List<int>, DateTime?>> fetchPost([String? language]) async {
   final response = await http.get(Uri.https(API_HOST, '/api/hitomi', {
     language == null ? '' : 'language': language,
   }));
 
   if (response.statusCode == 200) {
     // 만약 서버가 OK 응답을 반환하면, JSON을 파싱합니다.
-    // HTTP Date
-    String date = response.headers['generated-date']!;
-    return Tuple2<List<int>, DateTime>(
+    // HTTP Date: https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Date
+    String? date = response.headers['generated-date'];
+    return Tuple2<List<int>, DateTime?>(
       List.castFrom<dynamic, int>(json.decode(response.body)),
-      HttpDate.parse(date),
+      date == null ? null : HttpDate.parse(date),
     );
   } else {
     // 만약 응답이 OK가 아니면, 에러를 던집니다.
@@ -38,7 +38,7 @@ Future<Tuple2<List<int>, DateTime>> fetchPost([String? language]) async {
   }
 }
 
-Future<Tuple2<List<int>, DateTime>> searchGallery(query,
+Future<Tuple2<List<int>, DateTime?>> searchGallery(query,
     [String? language]) async {
   final response = await http.get(Uri.https(API_HOST, '/api/hitomi', {
     'query': query,
@@ -47,10 +47,10 @@ Future<Tuple2<List<int>, DateTime>> searchGallery(query,
 
   if (response.statusCode == 200) {
     // 만약 서버가 OK 응답을 반환하면, JSON을 파싱합니다.
-    String date = response.headers['generated-date']!;
-    return Tuple2<List<int>, DateTime>(
+    String? date = response.headers['generated-date'];
+    return Tuple2<List<int>, DateTime?>(
       List.castFrom<dynamic, int>(json.decode(response.body)),
-      HttpDate.parse(date),
+      date == null ? null : HttpDate.parse(date),
     );
   } else {
     // 만약 응답이 OK가 아니면, 에러를 던집니다.

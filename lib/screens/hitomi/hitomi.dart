@@ -30,7 +30,7 @@ class HitomiScreen extends StatefulWidget {
 
 class _HitomiScreenState extends State<HitomiScreen> {
   late Future<List<int>> galleries;
-  late Future<DateTime> date;
+  late Future<DateTime?> date;
 
   final AutoScrollController _controller = AutoScrollController();
 
@@ -45,7 +45,7 @@ class _HitomiScreenState extends State<HitomiScreen> {
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    Future<Tuple2<List<int>, DateTime>> data;
+    Future<Tuple2<List<int>, DateTime?>> data;
     if (query == null || query == '') {
       data = fetchPost(context.watch<Store>().language);
     } else {
@@ -68,9 +68,8 @@ class _HitomiScreenState extends State<HitomiScreen> {
           children: [
             FutureBuilder(
               future: date,
-              builder: (context, AsyncSnapshot<DateTime> snapshot) {
+              builder: (context, AsyncSnapshot<DateTime?> snapshot) {
                 if (snapshot.hasData) {
-                  // korean time
                   DateFormat formatter = DateFormat('yyyy. MM. dd. HH:mm:ss');
                   return Positioned(
                     top: 0,
@@ -86,7 +85,7 @@ class _HitomiScreenState extends State<HitomiScreen> {
                 } else if (snapshot.hasError) {
                   return Text('${snapshot.error}');
                 }
-                return const CircularProgressIndicator();
+                return Container();
               },
             ),
             FutureBuilder(
