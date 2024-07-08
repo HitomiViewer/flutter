@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:hitomiviewer/services/favorite.dart';
 import 'package:hitomiviewer/app_router.gr.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import 'package:prompt_dialog/prompt_dialog.dart';
 import 'package:provider/provider.dart';
 import 'package:settings_ui/settings_ui.dart';
@@ -168,7 +169,42 @@ class _SettingScreenState extends State<SettingScreen> {
                       )
                     ],
             ],
-          )
+          ),
+          SettingsSection(
+            title: const Text('App Info'),
+            tiles: <SettingsTile>[
+              SettingsTile(
+                leading: const Icon(Icons.info),
+                title: const Text('Name'),
+                value: FutureBuilder<PackageInfo>(
+                  future: PackageInfo.fromPlatform(),
+                  builder: (context, snapshot) {
+                    if (snapshot.hasData) {
+                      return Text(snapshot.data!.appName);
+                    } else if (snapshot.hasError) {
+                      return Text('${snapshot.error}');
+                    }
+                    return const CircularProgressIndicator();
+                  },
+                ),
+              ),
+              SettingsTile(
+                leading: const Icon(Icons.info),
+                title: const Text('Version'),
+                value: FutureBuilder<PackageInfo>(
+                  future: PackageInfo.fromPlatform(),
+                  builder: (context, snapshot) {
+                    if (snapshot.hasData) {
+                      return Text(snapshot.data!.version);
+                    } else if (snapshot.hasError) {
+                      return Text('${snapshot.error}');
+                    }
+                    return const CircularProgressIndicator();
+                  },
+                ),
+              ),
+            ],
+          ),
           // SettingsSection(
           //   title: const Text('Viewer'),
           //   tiles: <SettingsTile>[
