@@ -1,3 +1,4 @@
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:hitomiviewer/app_router.dart';
@@ -41,6 +42,16 @@ class App extends StatelessWidget {
         darkTheme: ThemeData.dark(),
         themeMode: ThemeMode.system,
         scrollBehavior: AppScrollBehavior(),
+        // localizationsDelegates: const [
+        //   DefaultMaterialLocalizations.delegate,
+        //   DefaultCupertinoLocalizations.delegate,
+        //   DefaultWidgetsLocalizations.delegate,
+        // ],
+        // supportedLocales: const [
+        //   Locale('en', 'US'),
+        //   Locale('ko', 'KR'),
+        // ],
+        // // locale: const Locale('ko', 'KR'),
       ),
     );
   }

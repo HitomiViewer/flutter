@@ -4,7 +4,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:hitomiviewer/services/hitomi.dart';
 import 'package:hitomiviewer/constants/api.dart';
+import 'package:hitomiviewer/store.dart';
 import 'package:hitomiviewer/widgets/zoomable_image.dart';
+import 'package:provider/provider.dart';
 
 class HitomiReaderArguments {
   final int id;
@@ -109,6 +111,23 @@ class _HitomiReaderScreenState extends State<HitomiReaderScreen> {
                           },
                           fullscreenDialog: true,
                         ));
+                  },
+                ),
+                IconButton(
+                  icon: context
+                          .read<Store>()
+                          .containsFavorite(args?.id ?? widget.id ?? 0)
+                      ? const Icon(Icons.favorite)
+                      : const Icon(Icons.favorite_border),
+                  onPressed: () {
+                    int? id = args?.id ?? widget.id;
+                    if (id == null) return;
+                    if (context.read<Store>().containsFavorite(id)) {
+                      context.read<Store>().removeFavorite(id);
+                    } else {
+                      context.read<Store>().addFavorite(id);
+                    }
+                    setState(() {});
                   },
                 ),
               ],
