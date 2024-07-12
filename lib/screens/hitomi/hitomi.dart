@@ -77,7 +77,7 @@ class _HitomiScreenState extends State<HitomiScreen> {
                     child: Container(
                       padding: const EdgeInsets.all(8),
                       child: Text(
-                        'Last updated: ${formatter.format(snapshot.data!.toLocal())}',
+                        'Last updated: ${formatter.format(snapshot.data!.toLocal())}, ${DateTime.now().difference(snapshot.data!).inMinutes} minutes ago',
                         style: TextStyle(color: Colors.white.withOpacity(0.5)),
                       ),
                     ),
@@ -129,6 +129,22 @@ class _HitomiScreenState extends State<HitomiScreen> {
               final id = await prompt(context);
               _controller.scrollToIndex(int.parse(id ?? '0'),
                   preferPosition: AutoScrollPosition.begin);
+            },
+          ),
+          FloatingActionButton.small(
+            heroTag: null,
+            child: const Icon(Icons.refresh),
+            onPressed: () {
+              setState(() {
+                Future<Tuple2<List<int>, DateTime?>> data;
+                if (query == null || query == '') {
+                  data = fetchPost(context.read<Store>().language);
+                } else {
+                  data = searchGallery(query, context.read<Store>().language);
+                }
+                galleries = data.then((value) => value.item1);
+                date = data.then((value) => value.item2);
+              });
             },
           ),
         ],
