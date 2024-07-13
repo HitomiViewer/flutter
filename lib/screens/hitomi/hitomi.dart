@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_expandable_fab/flutter_expandable_fab.dart';
 import 'package:hitomiviewer/services/hitomi.dart';
 import 'package:hitomiviewer/store.dart';
+import 'package:hitomiviewer/widgets/timer.dart';
 import 'package:intl/intl.dart';
 import 'package:prompt_dialog/prompt_dialog.dart';
 import 'package:provider/provider.dart';
@@ -67,28 +68,6 @@ class _HitomiScreenState extends State<HitomiScreen> {
         child: Stack(
           children: [
             FutureBuilder(
-              future: date,
-              builder: (context, AsyncSnapshot<DateTime?> snapshot) {
-                if (snapshot.hasData) {
-                  DateFormat formatter = DateFormat('yyyy. MM. dd. HH:mm:ss');
-                  return Positioned(
-                    top: 0,
-                    left: 0,
-                    child: Container(
-                      padding: const EdgeInsets.all(8),
-                      child: Text(
-                        'Last updated: ${formatter.format(snapshot.data!.toLocal())}, ${DateTime.now().difference(snapshot.data!).inMinutes} minutes ago',
-                        style: TextStyle(color: Colors.white.withOpacity(0.5)),
-                      ),
-                    ),
-                  );
-                } else if (snapshot.hasError) {
-                  return Text('${snapshot.error}');
-                }
-                return Container();
-              },
-            ),
-            FutureBuilder(
               key: Key(context.watch<Store>().language),
               future: galleries,
               builder: (context, AsyncSnapshot<List<int>> snapshot) {
@@ -113,6 +92,27 @@ class _HitomiScreenState extends State<HitomiScreen> {
                   return Text('${snapshot.error}');
                 }
                 return const CircularProgressIndicator();
+              },
+            ),
+            FutureBuilder(
+              future: date,
+              builder: (context, AsyncSnapshot<DateTime?> snapshot) {
+                print(snapshot.data);
+                if (snapshot.hasData) {
+                  return Positioned(
+                    top: 0,
+                    left: 0,
+                    width: MediaQuery.of(context).size.width,
+                    child: Container(
+                      color: Theme.of(context).scaffoldBackgroundColor,
+                      padding: const EdgeInsets.symmetric(horizontal: 8),
+                      child: TimerWidget(updateTime: snapshot.data!),
+                    ),
+                  );
+                } else if (snapshot.hasError) {
+                  return Text('${snapshot.error}');
+                }
+                return Container();
               },
             )
           ],
@@ -144,6 +144,7 @@ class _HitomiScreenState extends State<HitomiScreen> {
                 }
                 galleries = data.then((value) => value.item1);
                 date = data.then((value) => value.item2);
+                date.then((value) => value?.toLocal()).then(print);
               });
             },
           ),
