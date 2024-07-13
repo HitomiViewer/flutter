@@ -70,7 +70,9 @@ class ZoomableImageState extends State<ZoomableImage> {
         ),
         controller: _viewController,
         child: CachedNetworkImage(
-          placeholder: (context, url) => const CircularProgressIndicator(),
+          placeholder: (context, url) => Center(
+            child: const CircularProgressIndicator(),
+          ),
           imageUrl: widget.imageUrl,
           filterQuality: FilterQuality.high,
           imageBuilder: (context, imageProvider) {
