@@ -72,6 +72,12 @@ class _SettingScreenState extends State<SettingScreen> {
                     List<int> favorite = json.decode(result).cast<int>();
                     Provider.of<Store>(context, listen: false)
                         .setFavorite(favorite);
+
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Imported'),
+                      ),
+                    );
                   }
                 },
               ),
@@ -102,6 +108,12 @@ class _SettingScreenState extends State<SettingScreen> {
                           store.setAccessToken(accessToken);
 
                           await setFavorites(accessToken, store.favorite);
+
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Uploaded'),
+                            ),
+                          );
                         },
                       ),
                       SettingsTile.navigation(
@@ -114,6 +126,12 @@ class _SettingScreenState extends State<SettingScreen> {
                           store.setAccessToken(accessToken);
 
                           store.setFavorite(await getFavorites(accessToken));
+
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Downloaded'),
+                            ),
+                          );
                         },
                       ),
                       SettingsTile.navigation(
@@ -125,7 +143,15 @@ class _SettingScreenState extends State<SettingScreen> {
                               await refresh(store.refreshToken);
                           store.setAccessToken(accessToken);
 
+                          int before = store.favorite.length;
                           store.mergeFavorite(await getFavorites(accessToken));
+                          int after = store.favorite.length;
+
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text('Merged $before -> $after'),
+                            ),
+                          );
                         },
                       ),
                     ],
