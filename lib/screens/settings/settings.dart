@@ -116,6 +116,18 @@ class _SettingScreenState extends State<SettingScreen> {
                           store.setFavorite(await getFavorites(accessToken));
                         },
                       ),
+                      SettingsTile.navigation(
+                        leading: const Icon(Icons.merge_type),
+                        title: const Text('Merge'),
+                        onPressed: (context) async {
+                          final store = context.read<Store>();
+                          String accessToken =
+                              await refresh(store.refreshToken);
+                          store.setAccessToken(accessToken);
+
+                          store.mergeFavorite(await getFavorites(accessToken));
+                        },
+                      ),
                     ],
               SettingsTile(
                 leading: const Icon(Icons.share),

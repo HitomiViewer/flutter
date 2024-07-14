@@ -94,6 +94,18 @@ class Store extends ChangeNotifier {
     notifyListeners();
   }
 
+  mergeFavorite(List<int> favorite) {
+    favorite.forEach((element) {
+      if (!this.favorite.contains(element)) {
+        this.favorite.add(element);
+      }
+    });
+    this.favorite.sort((a, b) => b.compareTo(a));
+    _prefs?.setStringList(
+        'favorite', this.favorite.map((e) => e.toString()).toList());
+    notifyListeners();
+  }
+
   containsFavorite(int id) {
     return favorite.contains(id);
   }
