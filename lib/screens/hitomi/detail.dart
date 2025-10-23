@@ -1,10 +1,13 @@
+import 'package:auto_route/auto_route.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_expandable_fab/flutter_expandable_fab.dart';
+import 'package:hitomiviewer/services/gemma.dart';
 import 'package:provider/provider.dart';
 import 'package:share_plus/share_plus.dart';
 
+import '../../app_router.gr.dart';
 import '../../constants/api.dart';
 import '../../store.dart';
 import '../../widgets/preview.dart';
@@ -20,6 +23,14 @@ class HitomiDetailScreen extends StatefulWidget {
 }
 
 class _HitomiDetailScreenState extends State<HitomiDetailScreen> {
+  final gemmaService = GemmaService();
+
+  @override
+  void initState() {
+    super.initState();
+    gemmaService.checkModelStatus();
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -168,6 +179,17 @@ class _HitomiDetailScreenState extends State<HitomiDetailScreen> {
           color: Colors.black.withOpacity(0.5),
         ),
         children: [
+          // AI 분석 버튼 (모델이 설치된 경우에만 표시)
+          if (gemmaService.status == ModelStatus.installed)
+            FloatingActionButton.small(
+              heroTag: null,
+              child: const Icon(Icons.analytics),
+              onPressed: () {
+                context.router.push(GalleryAnalysisRoute(
+                  id: int.parse(widget.detail['id'].toString()),
+                ));
+              },
+            ),
           FloatingActionButton.small(
             heroTag: null,
             child: const Icon(Icons.share),

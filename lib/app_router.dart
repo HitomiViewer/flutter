@@ -3,7 +3,7 @@ import 'package:auto_route/auto_route.dart';
 import 'app_router.gr.dart';
 
 @AutoRouterConfig()
-class AppRouter extends $AppRouter {
+class AppRouter extends RootStackRouter {
   @override
   RouteType get defaultRouteType => const RouteType.material();
 
@@ -17,6 +17,8 @@ class AppRouter extends $AppRouter {
         AutoRoute(path: '/hitomi', page: HitomiRoute.page),
         AutoRoute(path: '/hitomi/ids', page: IdRoute.page),
         AutoRoute(path: '/hitomi/:id', page: HitomiReaderRoute.page),
+        AutoRoute(path: '/gallery-analysis/:id', page: GalleryAnalysisRoute.page),
+        AutoRoute(path: '/batch-analysis', page: BatchAnalysisRoute.page),
         AutoRoute(path: '/settings', page: SettingRoute.page),
         AutoRoute(path: '/settings/blacklist', page: BlacklistRoute.page)
       ];

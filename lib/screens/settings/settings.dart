@@ -4,6 +4,7 @@ import 'package:auto_route/auto_route.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:hitomiviewer/services/favorite.dart';
+import 'package:hitomiviewer/services/gemma.dart';
 import 'package:hitomiviewer/app_router.gr.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:prompt_dialog/prompt_dialog.dart';
@@ -24,6 +25,25 @@ class SettingScreen extends StatefulWidget {
 
 class _SettingScreenState extends State<SettingScreen> {
   bool toggle = false;
+  final gemmaService = GemmaService();
+
+  @override
+  void initState() {
+    super.initState();
+    // 모델 상태 확인
+    gemmaService.checkModelStatus();
+    gemmaService.addListener(() {
+      if (mounted) {
+        setState(() {});
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    gemmaService.removeListener(() {});
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -180,6 +200,134 @@ class _SettingScreenState extends State<SettingScreen> {
             ],
           ),
           SettingsSection(
+            title: const Text('AI 모델'),
+            tiles: [
+              SettingsTile(
+                leading: Icon(
+                  gemmaService.status == ModelStatus.installed
+                      ? Icons.check_circle
+                      : Icons.cloud_download,
+                ),
+                title: const Text('Gemma 3 Nano 4B'),
+                description: Text(_getModelStatusText()),
+                onPressed: (context) async {
+                  if (gemmaService.status == ModelStatus.downloading) {
+                    // 다운로드 중이면 무시
+                    return;
+                  }
+                  
+                  if (gemmaService.status == ModelStatus.installed) {
+                    // 이미 설치됨 - 삭제 확인
+                    final confirm = await showDialog<bool>(
+                      context: context,
+                      builder: (context) => AlertDialog(
+                        title: const Text('모델 삭제'),
+                        content: const Text('설치된 모델을 삭제하시겠습니까?'),
+                        actions: [
+                          TextButton(
+                            onPressed: () => Navigator.pop(context, false),
+                            child: const Text('취소'),
+                          ),
+                          TextButton(
+                            onPressed: () => Navigator.pop(context, true),
+                            child: const Text('삭제'),
+                          ),
+                        ],
+                      ),
+                    );
+                    
+                    if (confirm == true) {
+                      try {
+                        await gemmaService.deleteModel();
+                        if (mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('모델이 삭제되었습니다')),
+                          );
+                        }
+                      } catch (e) {
+                        if (mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text('삭제 실패: $e')),
+                          );
+                        }
+                      }
+                    }
+                  } else {
+                    // 다운로드 시작
+                    try {
+                      await gemmaService.downloadModel(
+                        onProgress: (progress) {
+                          // 진행률은 gemmaService에서 자동으로 notifyListeners 호출
+                        },
+                      );
+                      if (mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('모델 다운로드 완료')),
+                        );
+                      }
+                    } catch (e) {
+                      if (mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text('다운로드 실패: $e')),
+                        );
+                      }
+                    }
+                  }
+                },
+              ),
+              SettingsTile.navigation(
+                leading: const Icon(Icons.high_quality),
+                title: const Text('기본 분석 품질'),
+                value: Text(context.watch<Store>().imageQuality ==
+                        ImageQuality.thumbnail
+                    ? '썸네일 (권장)'
+                    : '원본 (고품질)'),
+                onPressed: (context) async {
+                  final quality = await showDialog<ImageQuality>(
+                    context: context,
+                    builder: (context) => AlertDialog(
+                      title: const Text('분석 품질 선택'),
+                      content: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          RadioListTile<ImageQuality>(
+                            title: const Text('썸네일 (권장)'),
+                            subtitle:
+                                const Text('~300KB, 빠른 처리 (3-5초/이미지)'),
+                            value: ImageQuality.thumbnail,
+                            groupValue: context.read<Store>().imageQuality,
+                            onChanged: (value) => Navigator.pop(context, value),
+                          ),
+                          RadioListTile<ImageQuality>(
+                            title: const Text('원본 (고품질)'),
+                            subtitle: const Text(
+                                '수MB, 상세 분석 (10-30초/이미지)\n데이터 사용량 증가'),
+                            value: ImageQuality.original,
+                            groupValue: context.read<Store>().imageQuality,
+                            onChanged: (value) => Navigator.pop(context, value),
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                  
+                  if (quality != null) {
+                    await context.read<Store>().setDefaultImageQuality(quality);
+                  }
+                },
+              ),
+              SettingsTile.navigation(
+                leading: const Icon(Icons.analytics),
+                title: const Text('좋아요 갤러리 분석'),
+                description: Text(
+                    '${context.watch<Store>().analyzedFavoriteCount}/${context.watch<Store>().favorite.length} 분석 완료'),
+                onPressed: (context) {
+                  context.router.pushNamed('/batch-analysis');
+                },
+              ),
+            ],
+          ),
+          SettingsSection(
             title: const Text('Account'),
             tiles: <SettingsTile>[
               context.read<Store>().refreshToken == ''
@@ -300,5 +448,18 @@ class _SettingScreenState extends State<SettingScreen> {
         ],
       ),
     );
+  }
+
+  String _getModelStatusText() {
+    switch (gemmaService.status) {
+      case ModelStatus.notInstalled:
+        return '미설치 - 탭하여 다운로드';
+      case ModelStatus.downloading:
+        return '다운로드 중 (${(gemmaService.downloadProgress * 100).toStringAsFixed(0)}%)';
+      case ModelStatus.installed:
+        return '설치됨 (~3.2GB) - 탭하여 삭제';
+      case ModelStatus.error:
+        return '오류: ${gemmaService.errorMessage ?? "알 수 없음"}';
+    }
   }
 }

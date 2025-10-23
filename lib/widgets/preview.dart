@@ -122,6 +122,9 @@ class _PreviewState extends State<Preview> {
                                           fontSize: 16,
                                           fontFamily: 'Pretendard'))),
                               const SizedBox(width: 10),
+                              // 추천도 배지
+                              _buildRecommendationBadge(context, widget.id),
+                              const SizedBox(width: 10),
                               Text(
                                   snapshot.data!['date']
                                       .toString()
@@ -157,6 +160,47 @@ class _PreviewState extends State<Preview> {
         );
       },
     );
+  }
+
+  Widget _buildRecommendationBadge(BuildContext context, int galleryId) {
+    final score = context.watch<Store>().calculateRecommendationScore(galleryId);
+    
+    if (score == null) {
+      return const SizedBox.shrink(); // 추천도가 없으면 표시하지 않음
+    }
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      decoration: BoxDecoration(
+        color: _getScoreColor(score),
+        borderRadius: BorderRadius.circular(4),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(Icons.star, size: 12, color: Colors.white),
+          const SizedBox(width: 2),
+          Text(
+            '${score.toInt()}%',
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 11,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Color _getScoreColor(double score) {
+    if (score >= 90) {
+      return Colors.green;
+    } else if (score >= 70) {
+      return Colors.orange;
+    } else {
+      return Colors.grey;
+    }
   }
 }
 

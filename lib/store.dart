@@ -1,7 +1,9 @@
+import 'dart:convert';
 import 'dart:math';
 
 import 'package:flutter/material.dart';
 import 'package:hitomiviewer/services/auth.dart';
+import 'package:hitomiviewer/services/gemma.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class Store extends ChangeNotifier {
@@ -22,6 +24,16 @@ class Store extends ChangeNotifier {
       favorite.sort((a, b) => b.compareTo(a));
 
       refreshToken = prefs.getString('refreshToken') ?? refreshToken;
+
+      // 이미지 분석 결과 로드
+      _loadImageAnalysis();
+      // 갤러리 임베딩 로드
+      _loadGalleryEmbeddings();
+      // 이미지 품질 설정 로드
+      imageQuality = ImageQuality.values.firstWhere(
+        (q) => q.toString() == prefs.getString('imageQuality'),
+        orElse: () => ImageQuality.thumbnail,
+      );
 
       notifyListeners();
     }).then((value) async {
@@ -146,5 +158,139 @@ class Store extends ChangeNotifier {
             .toList()
             .sublist(0, min(100, recent.length)));
     notifyListeners();
+  }
+
+  // ===== Gemma 이미지 분석 기능 =====
+
+  // 이미지 분석 결과 저장: galleryId -> { 'text': String, 'quality': String, 'timestamp': int }
+  var imageAnalysis = <int, Map<String, dynamic>>{};
+
+  // 갤러리 임베딩 저장: galleryId -> embedding vector
+  var galleryEmbeddings = <int, List<double>>{};
+
+  // 이미지 품질 설정
+  ImageQuality imageQuality = ImageQuality.thumbnail;
+
+  /// 이미지 분석 결과 로드
+  void _loadImageAnalysis() {
+    final jsonStr = _prefs?.getString('imageAnalysis');
+    if (jsonStr != null && jsonStr.isNotEmpty) {
+      try {
+        final Map<String, dynamic> decoded = json.decode(jsonStr);
+        imageAnalysis = decoded.map((key, value) => MapEntry(
+              int.parse(key),
+              Map<String, dynamic>.from(value),
+            ));
+      } catch (e) {
+        debugPrint('이미지 분석 결과 로드 실패: $e');
+      }
+    }
+  }
+
+  /// 갤러리 임베딩 로드
+  void _loadGalleryEmbeddings() {
+    final jsonStr = _prefs?.getString('galleryEmbeddings');
+    if (jsonStr != null && jsonStr.isNotEmpty) {
+      try {
+        final Map<String, dynamic> decoded = json.decode(jsonStr);
+        galleryEmbeddings = decoded.map((key, value) => MapEntry(
+              int.parse(key),
+              List<double>.from(value),
+            ));
+      } catch (e) {
+        debugPrint('갤러리 임베딩 로드 실패: $e');
+      }
+    }
+  }
+
+  /// 이미지 분석 결과 저장
+  Future<void> saveImageAnalysis(
+    int galleryId,
+    String analysis,
+    ImageQuality quality,
+  ) async {
+    imageAnalysis[galleryId] = {
+      'text': analysis,
+      'quality': quality.toString(),
+      'timestamp': DateTime.now().millisecondsSinceEpoch,
+    };
+
+    // SharedPreferences에 저장
+    final jsonStr = json.encode(imageAnalysis.map(
+      (key, value) => MapEntry(key.toString(), value),
+    ));
+    await _prefs?.setString('imageAnalysis', jsonStr);
+    notifyListeners();
+  }
+
+  /// 이미지 분석 결과 가져오기
+  Map<String, dynamic>? getImageAnalysis(int galleryId) {
+    return imageAnalysis[galleryId];
+  }
+
+  /// 갤러리 임베딩 저장
+  Future<void> saveGalleryEmbedding(
+    int galleryId,
+    List<double> embedding,
+  ) async {
+    galleryEmbeddings[galleryId] = embedding;
+
+    // SharedPreferences에 저장
+    final jsonStr = json.encode(galleryEmbeddings.map(
+      (key, value) => MapEntry(key.toString(), value),
+    ));
+    await _prefs?.setString('galleryEmbeddings', jsonStr);
+    notifyListeners();
+  }
+
+  /// 추천도 계산 (0-100)
+  double? calculateRecommendationScore(int galleryId) {
+    // 현재 갤러리의 임베딩이 없으면 null 반환
+    if (!galleryEmbeddings.containsKey(galleryId)) {
+      return null;
+    }
+
+    final currentEmbedding = galleryEmbeddings[galleryId]!;
+
+    // 좋아요한 갤러리들의 임베딩 가져오기
+    final favoriteEmbeddings = <List<double>>[];
+    for (var favId in favorite) {
+      if (galleryEmbeddings.containsKey(favId) && favId != galleryId) {
+        favoriteEmbeddings.add(galleryEmbeddings[favId]!);
+      }
+    }
+
+    // 좋아요한 갤러리가 없으면 null 반환
+    if (favoriteEmbeddings.isEmpty) {
+      return null;
+    }
+
+    // 각 좋아요 갤러리와의 유사도 계산
+    final gemmaService = GemmaService();
+    final similarities = <double>[];
+    for (var favEmbedding in favoriteEmbeddings) {
+      final similarity =
+          gemmaService.calculateSimilarity(currentEmbedding, favEmbedding);
+      similarities.add(similarity);
+    }
+
+    // 평균 유사도 계산
+    final avgSimilarity =
+        similarities.reduce((a, b) => a + b) / similarities.length;
+
+    // 0-100 범위로 변환 (-1~1 -> 0~100)
+    return ((avgSimilarity + 1) / 2) * 100;
+  }
+
+  /// 기본 이미지 품질 설정
+  Future<void> setDefaultImageQuality(ImageQuality quality) async {
+    imageQuality = quality;
+    await _prefs?.setString('imageQuality', quality.toString());
+    notifyListeners();
+  }
+
+  /// 분석 완료된 좋아요 갤러리 개수
+  int get analyzedFavoriteCount {
+    return favorite.where((id) => galleryEmbeddings.containsKey(id)).length;
   }
 }

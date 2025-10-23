@@ -49,6 +49,8 @@ class _HitomiScreenState extends State<HitomiScreen> {
     Future<Tuple2<List<int>, DateTime?>> data;
     if (query == null || query == '') {
       data = fetchPost(context.watch<Store>().language);
+    } else if (int.tryParse(query) != null) {
+      data = Future.value(Tuple2([int.parse(query)], null));
     } else {
       data = searchGallery(query, context.watch<Store>().language);
     }
@@ -142,9 +144,16 @@ class _HitomiScreenState extends State<HitomiScreen> {
                 } else {
                   data = searchGallery(query, context.read<Store>().language);
                 }
-                galleries = data.then((value) => value.item1);
-                date = data.then((value) => value.item2);
-                date.then((value) => value?.toLocal()).then(print);
+                setState(() {
+                  galleries = data.then((value) => value.item1);
+                  date = data.then((value) => value.item2);
+                  date.then((value) => value?.toLocal()).then(print);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Refreshed'),
+                    ),
+                  );
+                });
               });
             },
           ),
