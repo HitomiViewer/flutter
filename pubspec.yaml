@@ -48,8 +48,13 @@ dependencies:
   intl: ^0.20.2
   package_info_plus: ^9.0.0
   photo_view: ^0.15.0
-  flutter_gemma: ^0.11.8
   image_picker: ^1.0.7
+  onnxruntime:
+    git:
+      url: https://github.com/Kemerd/onnxruntime_flutter_1_22_0.git
+      ref: main
+  image: ^4.0.0
+  path_provider: ^2.1.2
 
 dev_dependencies:
   flutter_test:
@@ -79,6 +84,7 @@ flutter:
   assets:
     - assets/fonts/
     - assets/icons/
+    - assets/models/
   #   - images/a_dot_burr.jpeg
   #   - images/a_dot_ham.jpeg
 

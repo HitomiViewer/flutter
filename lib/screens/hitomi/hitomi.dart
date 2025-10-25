@@ -1,4 +1,3 @@
-import 'dart:developer';
 
 import 'package:auto_route/auto_route.dart';
 import 'package:flutter/material.dart';
@@ -82,7 +81,10 @@ class _HitomiScreenState extends State<HitomiScreen> {
                         key: ValueKey(snapshot.data![index]),
                         controller: _controller,
                         index: snapshot.data![index],
-                        child: Preview(id: snapshot.data![index]),
+                        child: Preview(
+                          id: snapshot.data![index],
+                          showRecommendationBadge: true, // 추천 탭에서는 추천도 표시
+                        ),
                       );
                     },
                     padding: const EdgeInsets.symmetric(

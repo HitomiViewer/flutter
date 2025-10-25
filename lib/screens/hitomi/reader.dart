@@ -120,8 +120,7 @@ class _HitomiReaderScreenState extends State<HitomiReaderScreen> {
                       ? const Icon(Icons.favorite)
                       : const Icon(Icons.favorite_border),
                   onPressed: () {
-                    int? id = args?.id ?? widget.id;
-                    if (id == null) return;
+                    int id = args?.id ?? widget.id ?? 0;
                     if (context.read<Store>().containsFavorite(id)) {
                       context.read<Store>().removeFavorite(id);
                     } else {

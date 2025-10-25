@@ -4,6 +4,7 @@ import 'package:auto_route/auto_route.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:hitomiviewer/services/hitomi.dart';
+import 'package:hitomiviewer/services/image_embedding.dart';
 import 'package:hitomiviewer/widgets/tag.dart';
 import 'package:provider/provider.dart';
 
@@ -13,8 +14,13 @@ import '../store.dart';
 
 class Preview extends StatefulWidget {
   final int id;
+  final bool showRecommendationBadge;
 
-  const Preview({Key? key, required this.id}) : super(key: key);
+  const Preview({
+    Key? key,
+    required this.id,
+    this.showRecommendationBadge = false,
+  }) : super(key: key);
 
   @override
   State<Preview> createState() => _PreviewState();
@@ -163,10 +169,93 @@ class _PreviewState extends State<Preview> {
   }
 
   Widget _buildRecommendationBadge(BuildContext context, int galleryId) {
-    final score = context.watch<Store>().calculateRecommendationScore(galleryId);
-    
-    if (score == null) {
-      return const SizedBox.shrink(); // 추천도가 없으면 표시하지 않음
+    // 🚀 플래그가 false면 표시하지 않음 (추천 탭이 아님)
+    if (!widget.showRecommendationBadge) {
+      return const SizedBox.shrink();
+    }
+
+    final store = context.watch<Store>();
+    final embeddingService = ImageEmbeddingService();
+
+    // 모델이 준비되지 않았거나 즐겨찾기가 비어있으면 표시하지 않음
+    if (!embeddingService.isModelReady || store.galleryEmbeddings.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    // 즐겨찾기 중에 임베딩된 갤러리가 없으면 표시 안 함
+    final hasFavoriteEmbeddings = store.favorite.any(
+      (favId) => store.galleryEmbeddings.containsKey(favId),
+    );
+    if (!hasFavoriteEmbeddings) {
+      return const SizedBox.shrink();
+    }
+
+    // 캐시된 추천도가 있으면 바로 표시
+    final cachedScore = store.calculateRecommendationScore(galleryId);
+    if (cachedScore != null) {
+      return _buildScoreBadge(cachedScore);
+    }
+
+    // 🚀 캐시가 없으면 비동기로 계산 (큐로 관리되어 동시 실행 제한됨)
+    return FutureBuilder<double>(
+      future: _calculateAndCacheScore(context, galleryId),
+      builder: (context, snapshot) {
+        if (snapshot.hasData && snapshot.data! > 0) {
+          return _buildScoreBadge(snapshot.data!);
+        }
+        // 로딩 중이거나 실패 시 표시하지 않음
+        return const SizedBox.shrink();
+      },
+    );
+  }
+
+  Future<double> _calculateAndCacheScore(
+      BuildContext context, int galleryId) async {
+    final store = Provider.of<Store>(context, listen: false);
+    final embeddingService = ImageEmbeddingService();
+
+    try {
+      // 썸네일 URL 생성 (detail에서 가져와야 함)
+      final detailSnapshot = await detail;
+      if (detailSnapshot['files'] == null || detailSnapshot['files'].isEmpty) {
+        return 0.0;
+      }
+
+      final thumbnailUrl =
+          'https://$API_HOST/api/hitomi/images/preview/${detailSnapshot['files'][0]['hash']}.webp';
+
+      // 즐겨찾기 갤러리의 임베딩만 사용
+      final favoriteEmbeddings = <int, List<double>>{};
+      for (var favId in store.favorite) {
+        if (store.galleryEmbeddings.containsKey(favId)) {
+          favoriteEmbeddings[favId] = store.galleryEmbeddings[favId]!;
+        }
+      }
+
+      if (favoriteEmbeddings.isEmpty) {
+        return 0.0;
+      }
+
+      // 추천도 계산
+      final score = await embeddingService.calculateRecommendationScore(
+        thumbnailUrl,
+        favoriteEmbeddings,
+      );
+
+      // 캐시에 저장
+      store.saveRecommendationScore(galleryId, score);
+
+      return score * 100; // 0-100 범위로 변환
+    } catch (e) {
+      debugPrint('추천도 계산 실패 (Gallery $galleryId): $e');
+      return 0.0;
+    }
+  }
+
+  Widget _buildScoreBadge(double score) {
+    // 30점 미만은 표시하지 않음 (이제 점수가 더 낮아졌으므로)
+    if (score < 30) {
+      return const SizedBox.shrink();
     }
 
     return Container(
@@ -178,13 +267,13 @@ class _PreviewState extends State<Preview> {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Icon(Icons.star, size: 12, color: Colors.white),
+          const Icon(Icons.auto_awesome, size: 10, color: Colors.white),
           const SizedBox(width: 2),
           Text(
-            '${score.toInt()}%',
+            '${score.toInt()}',
             style: const TextStyle(
               color: Colors.white,
-              fontSize: 11,
+              fontSize: 10,
               fontWeight: FontWeight.bold,
             ),
           ),
@@ -194,12 +283,15 @@ class _PreviewState extends State<Preview> {
   }
 
   Color _getScoreColor(double score) {
-    if (score >= 90) {
-      return Colors.green;
-    } else if (score >= 70) {
-      return Colors.orange;
+    // 점수가 낮아졌으므로 기준도 하향 조정
+    if (score >= 70) {
+      return Colors.green; // 70+ : 매우 추천!
+    } else if (score >= 50) {
+      return Colors.orange; // 50-69 : 괜찮은 추천
+    } else if (score >= 30) {
+      return Colors.grey; // 30-49 : 약한 추천
     } else {
-      return Colors.grey;
+      return Colors.transparent; // 표시 안 함
     }
   }
 }

@@ -2,10 +2,11 @@ import 'package:auto_route/auto_route.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:hitomiviewer/constants/api.dart';
-import 'package:hitomiviewer/services/gemma.dart';
+import 'package:hitomiviewer/services/image_embedding.dart';
 import 'package:hitomiviewer/services/hitomi.dart';
 import 'package:hitomiviewer/store.dart';
 import 'package:provider/provider.dart';
+import 'package:http/http.dart' as http;
 
 @RoutePage()
 class GalleryAnalysisScreen extends StatefulWidget {
@@ -20,19 +21,19 @@ class GalleryAnalysisScreen extends StatefulWidget {
 
 class _GalleryAnalysisScreenState extends State<GalleryAnalysisScreen> {
   late Future<Map<String, dynamic>> detail;
-  final gemmaService = GemmaService();
-  ImageQuality selectedQuality = ImageQuality.thumbnail;
-  
+  final embeddingService = ImageEmbeddingService();
+  bool useThumbnail = true;
+
   // 이미지별 분석 상태
   Map<int, bool> analyzing = {};
-  Map<int, String?> analysisResults = {};
+  Map<int, bool> analyzed = {};
   Map<int, String?> analysisErrors = {};
 
   @override
   void initState() {
     super.initState();
     detail = fetchDetail(widget.id.toString());
-    selectedQuality = context.read<Store>().imageQuality;
+    // PE-Core 모델은 앱 시작 시 초기화됨
   }
 
   @override
@@ -41,11 +42,6 @@ class _GalleryAnalysisScreenState extends State<GalleryAnalysisScreen> {
       appBar: AppBar(
         title: const Text('갤러리 분석'),
         actions: [
-          // 품질 선택 버튼
-          IconButton(
-            icon: const Icon(Icons.settings),
-            onPressed: _showQualityDialog,
-          ),
           // 전체 분석 버튼
           IconButton(
             icon: const Icon(Icons.play_arrow),
@@ -61,7 +57,7 @@ class _GalleryAnalysisScreenState extends State<GalleryAnalysisScreen> {
             return Column(
               children: [
                 // 상단 정보 카드
-                _buildInfoCard(snapshot.data!),
+                _buildInfoCard(snapshot.data!, files.length),
                 // 이미지 그리드
                 Expanded(
                   child: GridView.builder(
@@ -90,10 +86,9 @@ class _GalleryAnalysisScreenState extends State<GalleryAnalysisScreen> {
     );
   }
 
-  Widget _buildInfoCard(Map<String, dynamic> data) {
-    final files = data['files'] as List;
-    final analyzedCount = analysisResults.values.where((r) => r != null).length;
-    
+  Widget _buildInfoCard(Map<String, dynamic> data, int totalCount) {
+    final analyzedCount = analyzed.values.where((a) => a == true).length;
+
     return Card(
       margin: const EdgeInsets.all(8),
       child: Padding(
@@ -111,7 +106,7 @@ class _GalleryAnalysisScreenState extends State<GalleryAnalysisScreen> {
             Row(
               children: [
                 Chip(
-                  label: Text('총 ${files.length}장'),
+                  label: Text('총 $totalCount장'),
                   avatar: const Icon(Icons.image, size: 16),
                 ),
                 const SizedBox(width: 8),
@@ -121,10 +116,8 @@ class _GalleryAnalysisScreenState extends State<GalleryAnalysisScreen> {
                 ),
                 const SizedBox(width: 8),
                 Chip(
-                  label: Text(selectedQuality == ImageQuality.thumbnail
-                      ? '썸네일'
-                      : '원본'),
-                  avatar: const Icon(Icons.high_quality, size: 16),
+                  label: Text(useThumbnail ? '썸네일' : '원본'),
+                  avatar: const Icon(Icons.image, size: 16),
                 ),
               ],
             ),
@@ -136,17 +129,16 @@ class _GalleryAnalysisScreenState extends State<GalleryAnalysisScreen> {
 
   Widget _buildImageCard(Map<String, dynamic> file, int index) {
     final hash = file['hash'];
-    final imageUrl = selectedQuality == ImageQuality.thumbnail
+    final imageUrl = useThumbnail
         ? 'https://$API_HOST/api/hitomi/images/preview/$hash.webp'
         : 'https://$API_HOST/api/hitomi/images/$hash.webp';
 
     final isAnalyzing = analyzing[index] ?? false;
-    final result = analysisResults[index];
+    final isAnalyzed = analyzed[index] ?? false;
     final error = analysisErrors[index];
 
     return GestureDetector(
       onTap: () => _analyzeImage(imageUrl, index),
-      onLongPress: result != null ? () => _showAnalysisResult(result, index) : null,
       child: Stack(
         children: [
           // 이미지
@@ -154,7 +146,7 @@ class _GalleryAnalysisScreenState extends State<GalleryAnalysisScreen> {
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(8),
               border: Border.all(
-                color: result != null ? Colors.green : Colors.grey,
+                color: isAnalyzed ? Colors.green : Colors.grey,
                 width: 2,
               ),
             ),
@@ -170,7 +162,7 @@ class _GalleryAnalysisScreenState extends State<GalleryAnalysisScreen> {
             ),
           ),
           // 상태 오버레이
-          if (isAnalyzing || result != null || error != null)
+          if (isAnalyzing || isAnalyzed || error != null)
             Container(
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(8),
@@ -206,48 +198,10 @@ class _GalleryAnalysisScreenState extends State<GalleryAnalysisScreen> {
     );
   }
 
-  void _showQualityDialog() {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('분석 품질 선택'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            RadioListTile<ImageQuality>(
-              title: const Text('썸네일 (권장)'),
-              subtitle: const Text('~300KB, 빠른 처리 (3-5초/이미지)'),
-              value: ImageQuality.thumbnail,
-              groupValue: selectedQuality,
-              onChanged: (value) {
-                setState(() {
-                  selectedQuality = value!;
-                });
-                Navigator.pop(context);
-              },
-            ),
-            RadioListTile<ImageQuality>(
-              title: const Text('원본 (고품질)'),
-              subtitle: const Text('수MB, 상세 분석 (10-30초/이미지)\n데이터 사용량 증가'),
-              value: ImageQuality.original,
-              groupValue: selectedQuality,
-              onChanged: (value) {
-                setState(() {
-                  selectedQuality = value!;
-                });
-                Navigator.pop(context);
-              },
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
   Future<void> _analyzeImage(String imageUrl, int index) async {
-    if (!gemmaService.isModelReady) {
+    if (!embeddingService.isModelReady) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('모델이 설치되지 않았습니다. 설정에서 다운로드하세요.')),
+        const SnackBar(content: Text('모델이 다운로드되지 않았습니다. 설정에서 다운로드하세요.')),
       );
       return;
     }
@@ -262,24 +216,23 @@ class _GalleryAnalysisScreenState extends State<GalleryAnalysisScreen> {
     });
 
     try {
-      final result = await gemmaService.analyzeImage(
-        imageUrl,
-        quality: selectedQuality,
+      // 이미지 다운로드
+      final response = await http.get(Uri.parse(imageUrl));
+      if (response.statusCode != 200) {
+        throw Exception('이미지 다운로드 실패: ${response.statusCode}');
+      }
+
+      // 임베딩 생성
+      final embedding = await embeddingService.getImageEmbedding(
+        response.bodyBytes,
       );
 
       setState(() {
-        analysisResults[index] = result;
+        analyzed[index] = true;
         analyzing[index] = false;
       });
 
-      // 분석 결과 저장
-      final store = context.read<Store>();
-      await store.saveImageAnalysis(widget.id, result, selectedQuality);
-
-      // 임베딩 생성 및 저장
-      final embedding = await gemmaService.getTextEmbedding(result);
-      await store.saveGalleryEmbedding(widget.id, embedding);
-
+      // 임베딩 저장 (나중에 추가 가능)
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('이미지 ${index + 1} 분석 완료')),
       );
@@ -295,56 +248,10 @@ class _GalleryAnalysisScreenState extends State<GalleryAnalysisScreen> {
     }
   }
 
-  void _showAnalysisResult(String result, int index) {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      builder: (context) => DraggableScrollableSheet(
-        initialChildSize: 0.6,
-        minChildSize: 0.3,
-        maxChildSize: 0.9,
-        expand: false,
-        builder: (context, scrollController) {
-          return Container(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Text(
-                      '이미지 ${index + 1} 분석 결과',
-                      style: const TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const Spacer(),
-                    IconButton(
-                      icon: const Icon(Icons.close),
-                      onPressed: () => Navigator.pop(context),
-                    ),
-                  ],
-                ),
-                const Divider(),
-                Expanded(
-                  child: SingleChildScrollView(
-                    controller: scrollController,
-                    child: Text(result),
-                  ),
-                ),
-              ],
-            ),
-          );
-        },
-      ),
-    );
-  }
-
   Future<void> _analyzeAll() async {
-    if (!gemmaService.isModelReady) {
+    if (!embeddingService.isModelReady) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('모델이 설치되지 않았습니다. 설정에서 다운로드하세요.')),
+        const SnackBar(content: Text('모델이 다운로드되지 않았습니다. 설정에서 다운로드하세요.')),
       );
       return;
     }
@@ -358,8 +265,8 @@ class _GalleryAnalysisScreenState extends State<GalleryAnalysisScreen> {
         title: const Text('전체 분석'),
         content: Text(
           '총 ${files.length}장의 이미지를 분석합니다.\n'
-          '품질: ${selectedQuality == ImageQuality.thumbnail ? "썸네일" : "원본"}\n'
-          '예상 시간: ${selectedQuality == ImageQuality.thumbnail ? files.length * 5 : files.length * 20}초\n\n'
+          '이미지: ${useThumbnail ? "썸네일" : "원본"}\n'
+          '예상 시간: ${files.length * 2}초\n\n'
           '계속하시겠습니까?',
         ),
         actions: [
@@ -378,12 +285,12 @@ class _GalleryAnalysisScreenState extends State<GalleryAnalysisScreen> {
     if (confirm != true) return;
 
     for (var i = 0; i < files.length; i++) {
-      if (analysisResults[i] != null) {
+      if (analyzed[i] == true) {
         continue; // 이미 분석된 이미지는 건너뛰기
       }
 
       final hash = files[i]['hash'];
-      final imageUrl = selectedQuality == ImageQuality.thumbnail
+      final imageUrl = useThumbnail
           ? 'https://$API_HOST/api/hitomi/images/preview/$hash.webp'
           : 'https://$API_HOST/api/hitomi/images/$hash.webp';
 
@@ -395,4 +302,3 @@ class _GalleryAnalysisScreenState extends State<GalleryAnalysisScreen> {
     );
   }
 }
-

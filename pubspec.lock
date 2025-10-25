@@ -65,14 +65,6 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "10.2.5"
-  background_downloader:
-    dependency: transitive
-    description:
-      name: background_downloader
-      sha256: a22acfa37aa06ba5cfe6eb7b1aa700c78af64770ff450c73dd3d279d7c37d4ac
-      url: "https://pub.dev"
-    source: hosted
-    version: "9.2.6"
   boolean_selector:
     dependency: transitive
     description:
@@ -334,14 +326,6 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "2.5.2"
-  flutter_gemma:
-    dependency: "direct main"
-    description:
-      name: flutter_gemma
-      sha256: fcaef49dfcfcae89108ff21935ddb675fe20ca67272d48ea13e2eac2fd5ed3fb
-      url: "https://pub.dev"
-    source: hosted
-    version: "0.11.8"
   flutter_lints:
     dependency: "direct dev"
     description:
@@ -441,7 +425,7 @@ packages:
     source: hosted
     version: "4.1.2"
   image:
-    dependency: transitive
+    dependency: "direct main"
     description:
       name: image
       sha256: "4e973fcf4caae1a4be2fa0a13157aa38a8f9cb049db6529aa00b4d71abc4d928"
@@ -536,14 +520,6 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "4.9.0"
-  large_file_handler:
-    dependency: transitive
-    description:
-      name: large_file_handler
-      sha256: c2ecaf552e8039119bbe3a094d15aecbafe833899f30b2dcfbb513eddf76b36f
-      url: "https://pub.dev"
-    source: hosted
-    version: "0.3.1"
   leak_tracker:
     dependency: transitive
     description:
@@ -648,6 +624,15 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "2.1.0"
+  onnxruntime:
+    dependency: "direct main"
+    description:
+      path: "."
+      ref: main
+      resolved-ref: "40e4b8c298920912facc364090dceadbd25e6334"
+      url: "https://github.com/Kemerd/onnxruntime_flutter_1_22_0.git"
+    source: git
+    version: "1.22.1"
   package_config:
     dependency: transitive
     description:
@@ -689,7 +674,7 @@ packages:
     source: hosted
     version: "1.1.0"
   path_provider:
-    dependency: transitive
+    dependency: "direct main"
     description:
       name: path_provider
       sha256: "50c5dd5b6e1aaf6fb3a78b33f6aa3afca52bf903a8a5298f53101fdaee55bbcd"

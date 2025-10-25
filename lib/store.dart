@@ -3,7 +3,6 @@ import 'dart:math';
 
 import 'package:flutter/material.dart';
 import 'package:hitomiviewer/services/auth.dart';
-import 'package:hitomiviewer/services/gemma.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class Store extends ChangeNotifier {
@@ -29,11 +28,6 @@ class Store extends ChangeNotifier {
       _loadImageAnalysis();
       // 갤러리 임베딩 로드
       _loadGalleryEmbeddings();
-      // 이미지 품질 설정 로드
-      imageQuality = ImageQuality.values.firstWhere(
-        (q) => q.toString() == prefs.getString('imageQuality'),
-        orElse: () => ImageQuality.thumbnail,
-      );
 
       notifyListeners();
     }).then((value) async {
@@ -160,7 +154,7 @@ class Store extends ChangeNotifier {
     notifyListeners();
   }
 
-  // ===== Gemma 이미지 분석 기능 =====
+  // ===== 이미지 임베딩 기능 =====
 
   // 이미지 분석 결과 저장: galleryId -> { 'text': String, 'quality': String, 'timestamp': int }
   var imageAnalysis = <int, Map<String, dynamic>>{};
@@ -168,8 +162,32 @@ class Store extends ChangeNotifier {
   // 갤러리 임베딩 저장: galleryId -> embedding vector
   var galleryEmbeddings = <int, List<double>>{};
 
-  // 이미지 품질 설정
-  ImageQuality imageQuality = ImageQuality.thumbnail;
+  // 각 임베딩에 사용된 모델 정보: galleryId -> model name
+  var embeddingModels = <int, String>{};
+
+  // 추천도 캐시: galleryId -> 추천도(0-100)
+  var recommendationScores = <int, double>{};
+
+  /// 추천도 계산 (캐시 활용)
+  double? calculateRecommendationScore(int galleryId) {
+    // 이미 계산된 경우 캐시 반환
+    if (recommendationScores.containsKey(galleryId)) {
+      return recommendationScores[galleryId];
+    }
+    return null; // 아직 계산되지 않음
+  }
+
+  /// 추천도 저장
+  void saveRecommendationScore(int galleryId, double score) {
+    recommendationScores[galleryId] = score * 100; // 0-1을 0-100으로 변환
+    notifyListeners();
+  }
+
+  /// 추천도 캐시 초기화
+  void clearRecommendationScores() {
+    recommendationScores.clear();
+    notifyListeners();
+  }
 
   /// 이미지 분석 결과 로드
   void _loadImageAnalysis() {
@@ -201,17 +219,31 @@ class Store extends ChangeNotifier {
         debugPrint('갤러리 임베딩 로드 실패: $e');
       }
     }
+
+    // 임베딩 모델 정보 로드
+    final modelsStr = _prefs?.getString('embeddingModels');
+    if (modelsStr != null && modelsStr.isNotEmpty) {
+      try {
+        final Map<String, dynamic> decoded = json.decode(modelsStr);
+        embeddingModels = decoded.map((key, value) => MapEntry(
+              int.parse(key),
+              value.toString(),
+            ));
+      } catch (e) {
+        debugPrint('임베딩 모델 정보 로드 실패: $e');
+      }
+    }
   }
 
   /// 이미지 분석 결과 저장
   Future<void> saveImageAnalysis(
     int galleryId,
-    String analysis,
-    ImageQuality quality,
-  ) async {
+    String analysis, {
+    String? modelName,
+  }) async {
     imageAnalysis[galleryId] = {
       'text': analysis,
-      'quality': quality.toString(),
+      'model': modelName,
       'timestamp': DateTime.now().millisecondsSinceEpoch,
     };
 
@@ -231,61 +263,35 @@ class Store extends ChangeNotifier {
   /// 갤러리 임베딩 저장
   Future<void> saveGalleryEmbedding(
     int galleryId,
-    List<double> embedding,
-  ) async {
+    List<double> embedding, {
+    String? modelName,
+  }) async {
     galleryEmbeddings[galleryId] = embedding;
 
+    if (modelName != null) {
+      embeddingModels[galleryId] = modelName;
+    }
+
     // SharedPreferences에 저장
-    final jsonStr = json.encode(galleryEmbeddings.map(
+    final embeddingsJson = json.encode(galleryEmbeddings.map(
       (key, value) => MapEntry(key.toString(), value),
     ));
-    await _prefs?.setString('galleryEmbeddings', jsonStr);
+    await _prefs?.setString('galleryEmbeddings', embeddingsJson);
+
+    final modelsJson = json.encode(embeddingModels.map(
+      (key, value) => MapEntry(key.toString(), value),
+    ));
+    await _prefs?.setString('embeddingModels', modelsJson);
+
     notifyListeners();
   }
 
-  /// 추천도 계산 (0-100)
-  double? calculateRecommendationScore(int galleryId) {
-    // 현재 갤러리의 임베딩이 없으면 null 반환
-    if (!galleryEmbeddings.containsKey(galleryId)) {
-      return null;
-    }
-
-    final currentEmbedding = galleryEmbeddings[galleryId]!;
-
-    // 좋아요한 갤러리들의 임베딩 가져오기
-    final favoriteEmbeddings = <List<double>>[];
-    for (var favId in favorite) {
-      if (galleryEmbeddings.containsKey(favId) && favId != galleryId) {
-        favoriteEmbeddings.add(galleryEmbeddings[favId]!);
-      }
-    }
-
-    // 좋아요한 갤러리가 없으면 null 반환
-    if (favoriteEmbeddings.isEmpty) {
-      return null;
-    }
-
-    // 각 좋아요 갤러리와의 유사도 계산
-    final gemmaService = GemmaService();
-    final similarities = <double>[];
-    for (var favEmbedding in favoriteEmbeddings) {
-      final similarity =
-          gemmaService.calculateSimilarity(currentEmbedding, favEmbedding);
-      similarities.add(similarity);
-    }
-
-    // 평균 유사도 계산
-    final avgSimilarity =
-        similarities.reduce((a, b) => a + b) / similarities.length;
-
-    // 0-100 범위로 변환 (-1~1 -> 0~100)
-    return ((avgSimilarity + 1) / 2) * 100;
-  }
-
-  /// 기본 이미지 품질 설정
-  Future<void> setDefaultImageQuality(ImageQuality quality) async {
-    imageQuality = quality;
-    await _prefs?.setString('imageQuality', quality.toString());
+  /// 임베딩 삭제
+  Future<void> clearEmbeddings() async {
+    galleryEmbeddings.clear();
+    embeddingModels.clear();
+    await _prefs?.remove('galleryEmbeddings');
+    await _prefs?.remove('embeddingModels');
     notifyListeners();
   }
 

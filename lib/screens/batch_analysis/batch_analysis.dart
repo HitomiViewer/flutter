@@ -1,10 +1,11 @@
 import 'package:auto_route/auto_route.dart';
 import 'package:flutter/material.dart';
 import 'package:hitomiviewer/constants/api.dart';
-import 'package:hitomiviewer/services/gemma.dart';
+import 'package:hitomiviewer/services/image_embedding.dart';
 import 'package:hitomiviewer/services/hitomi.dart';
 import 'package:hitomiviewer/store.dart';
 import 'package:provider/provider.dart';
+import 'package:http/http.dart' as http;
 
 enum BatchAnalysisState { idle, running, paused, completed, error }
 
@@ -17,25 +18,24 @@ class BatchAnalysisScreen extends StatefulWidget {
 }
 
 class _BatchAnalysisScreenState extends State<BatchAnalysisScreen> {
-  final gemmaService = GemmaService();
+  final embeddingService = ImageEmbeddingService();
   BatchAnalysisState _state = BatchAnalysisState.idle;
-  ImageQuality _selectedQuality = ImageQuality.thumbnail;
-  
+  bool _useThumbnail = true; // 썸네일 사용 여부
+
   int _currentIndex = 0;
   int _totalCount = 0;
   List<int> _galleryIds = [];
   List<int> _failedGalleries = [];
   Map<int, String> _galleryTitles = {};
   Map<int, String> _analysisStatus = {};
-  
+
   bool _isPaused = false;
   DateTime? _startTime;
-  
+
   @override
   void initState() {
     super.initState();
-    _selectedQuality = context.read<Store>().imageQuality;
-    gemmaService.checkModelStatus();
+    // PE-Core 모델은 앱 시작 시 초기화됨
     _loadGalleries();
   }
 
@@ -43,7 +43,7 @@ class _BatchAnalysisScreenState extends State<BatchAnalysisScreen> {
     final store = context.read<Store>();
     _galleryIds = List.from(store.favorite);
     _totalCount = _galleryIds.length;
-    
+
     // 이미 분석된 갤러리 상태 표시
     for (var id in _galleryIds) {
       if (store.galleryEmbeddings.containsKey(id)) {
@@ -52,7 +52,7 @@ class _BatchAnalysisScreenState extends State<BatchAnalysisScreen> {
         _analysisStatus[id] = '대기 중';
       }
     }
-    
+
     setState(() {});
   }
 
@@ -81,7 +81,7 @@ class _BatchAnalysisScreenState extends State<BatchAnalysisScreen> {
     final store = context.watch<Store>();
     final analyzedCount = store.analyzedFavoriteCount;
     final progress = _totalCount > 0 ? analyzedCount / _totalCount : 0.0;
-    
+
     // 예상 완료 시간 계산
     String estimatedTime = '';
     if (_state == BatchAnalysisState.running && _startTime != null) {
@@ -129,11 +129,9 @@ class _BatchAnalysisScreenState extends State<BatchAnalysisScreen> {
             Row(
               children: [
                 Chip(
-                  avatar: const Icon(Icons.high_quality, size: 16),
+                  avatar: const Icon(Icons.image, size: 16),
                   label: Text(
-                    _selectedQuality == ImageQuality.thumbnail
-                        ? '썸네일 (빠름)'
-                        : '원본 (고품질)',
+                    _useThumbnail ? '썸네일 (빠름)' : '원본',
                   ),
                 ),
                 const SizedBox(width: 8),
@@ -155,7 +153,7 @@ class _BatchAnalysisScreenState extends State<BatchAnalysisScreen> {
               TextButton.icon(
                 onPressed: _showQualityDialog,
                 icon: const Icon(Icons.settings),
-                label: const Text('품질 변경'),
+                label: const Text('썸네일/원본 선택'),
               ),
             ],
           ],
@@ -177,7 +175,8 @@ class _BatchAnalysisScreenState extends State<BatchAnalysisScreen> {
       itemBuilder: (context, index) {
         final galleryId = _galleryIds[index];
         final status = _analysisStatus[galleryId] ?? '대기 중';
-        final isCurrent = index == _currentIndex && _state == BatchAnalysisState.running;
+        final isCurrent =
+            index == _currentIndex && _state == BatchAnalysisState.running;
         final isFailed = _failedGalleries.contains(galleryId);
 
         return FutureBuilder<Map<String, dynamic>>(
@@ -257,7 +256,8 @@ class _BatchAnalysisScreenState extends State<BatchAnalysisScreen> {
             if (_state == BatchAnalysisState.idle) ...[
               Expanded(
                 child: ElevatedButton.icon(
-                  onPressed: gemmaService.isModelReady ? _startAnalysis : null,
+                  onPressed:
+                      embeddingService.isModelReady ? _startAnalysis : null,
                   icon: const Icon(Icons.play_arrow),
                   label: const Text('분석 시작'),
                   style: ElevatedButton.styleFrom(
@@ -333,37 +333,35 @@ class _BatchAnalysisScreenState extends State<BatchAnalysisScreen> {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('분석 품질 선택'),
+        title: const Text('이미지 선택'),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             const Text(
-              '배치 분석에 사용할 이미지 품질을 선택하세요.',
+              '배치 분석에 사용할 이미지를 선택하세요.',
               style: TextStyle(fontSize: 14),
             ),
             const SizedBox(height: 16),
-            RadioListTile<ImageQuality>(
+            RadioListTile<bool>(
               title: const Text('썸네일 (권장)'),
-              subtitle: const Text('~300KB, 빠른 처리 (3-5초/이미지)'),
-              value: ImageQuality.thumbnail,
-              groupValue: _selectedQuality,
+              subtitle: const Text('~300KB, 빠른 처리'),
+              value: true,
+              groupValue: _useThumbnail,
               onChanged: (value) {
                 setState(() {
-                  _selectedQuality = value!;
+                  _useThumbnail = value!;
                 });
                 Navigator.pop(context);
               },
             ),
-            RadioListTile<ImageQuality>(
-              title: const Text('원본 (고품질)'),
-              subtitle: const Text(
-                '수MB, 상세 분석 (10-30초/이미지)\n데이터 사용량 증가',
-              ),
-              value: ImageQuality.original,
-              groupValue: _selectedQuality,
+            RadioListTile<bool>(
+              title: const Text('원본'),
+              subtitle: const Text('수MB, 고해상도\n데이터 사용량 증가'),
+              value: false,
+              groupValue: _useThumbnail,
               onChanged: (value) {
                 setState(() {
-                  _selectedQuality = value!;
+                  _useThumbnail = value!;
                 });
                 Navigator.pop(context);
               },
@@ -375,10 +373,10 @@ class _BatchAnalysisScreenState extends State<BatchAnalysisScreen> {
   }
 
   Future<void> _startAnalysis() async {
-    if (!gemmaService.isModelReady) {
+    if (!embeddingService.isModelReady) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('모델이 설치되지 않았습니다. 설정에서 다운로드하세요.'),
+          content: Text('모델이 다운로드되지 않았습니다. 설정에서 다운로드하세요.'),
         ),
       );
       return;
@@ -398,8 +396,8 @@ class _BatchAnalysisScreenState extends State<BatchAnalysisScreen> {
         title: const Text('배치 분석 시작'),
         content: Text(
           '총 $_totalCount개의 갤러리를 분석합니다.\n'
-          '품질: ${_selectedQuality == ImageQuality.thumbnail ? "썸네일" : "원본"}\n'
-          '예상 시간: ${_selectedQuality == ImageQuality.thumbnail ? _totalCount * 5 : _totalCount * 20}초\n\n'
+          '이미지: ${_useThumbnail ? "썸네일" : "원본"}\n'
+          '예상 시간: ${_totalCount * 2}초\n\n'
           '계속하시겠습니까?',
         ),
         actions: [
@@ -460,22 +458,27 @@ class _BatchAnalysisScreenState extends State<BatchAnalysisScreen> {
 
         // 첫 번째 이미지만 분석 (대표 이미지)
         final hash = files[0]['hash'];
-        final imageUrl = _selectedQuality == ImageQuality.thumbnail
+        final imageUrl = _useThumbnail
             ? 'https://$API_HOST/api/hitomi/images/preview/$hash.webp'
             : 'https://$API_HOST/api/hitomi/images/$hash.webp';
 
-        // 이미지 분석
-        final result = await gemmaService.analyzeImage(
-          imageUrl,
-          quality: _selectedQuality,
+        // 이미지 다운로드
+        final response = await http.get(Uri.parse(imageUrl));
+        if (response.statusCode != 200) {
+          throw Exception('이미지 다운로드 실패: ${response.statusCode}');
+        }
+
+        // 임베딩 생성
+        final embedding = await embeddingService.getImageEmbedding(
+          response.bodyBytes,
         );
 
-        // 분석 결과 저장
-        await store.saveImageAnalysis(galleryId, result, _selectedQuality);
-
-        // 임베딩 생성 및 저장
-        final embedding = await gemmaService.getTextEmbedding(result);
-        await store.saveGalleryEmbedding(galleryId, embedding);
+        // 임베딩 저장
+        await store.saveGalleryEmbedding(
+          galleryId,
+          embedding,
+          modelName: 'PE-Core-L14',
+        );
 
         setState(() {
           _analysisStatus[galleryId] = '분석 완료';
@@ -535,4 +538,3 @@ class _BatchAnalysisScreenState extends State<BatchAnalysisScreen> {
     );
   }
 }
-
