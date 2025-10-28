@@ -32,8 +32,9 @@ Future<Map<String, dynamic>> fetchDetail(String id) async {
         final responseBody = utf8.decode(response.bodyBytes);
         final data = json.decode(responseBody);
         
-        // 캐시 저장 (24시간)
-        await cache.set(cacheKey, responseBody, const Duration(hours: 24));
+        // 캐시 저장 (영구 - 100년)
+        // 갤러리 상세 정보는 변경되지 않으므로 영구 캐시
+        await cache.set(cacheKey, responseBody, const Duration(days: 36500));
         
         return data;
       } catch (e, stackTrace) {
