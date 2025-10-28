@@ -1,3 +1,5 @@
+import 'dart:async';
+import 'dart:isolate';
 import 'dart:math';
 import 'dart:typed_data';
 import 'package:flutter/foundation.dart';
@@ -17,6 +19,40 @@ enum ModelStatus {
   error,
 }
 
+// Isolate 통신 프로토콜
+enum IsolateRequestType {
+  initialize,
+  processImage,
+  processText,
+  dispose,
+}
+
+class IsolateRequest {
+  final String id;
+  final IsolateRequestType type;
+  final Map<String, dynamic> data;
+
+  IsolateRequest({
+    required this.id,
+    required this.type,
+    required this.data,
+  });
+}
+
+class IsolateResponse {
+  final String id;
+  final bool success;
+  final dynamic result;
+  final String? error;
+
+  IsolateResponse({
+    required this.id,
+    required this.success,
+    this.result,
+    this.error,
+  });
+}
+
 class SimilarImageResult {
   final int id;
   final double similarity;
@@ -33,9 +69,14 @@ class ImageEmbeddingService extends ChangeNotifier {
   factory ImageEmbeddingService() => _instance;
   ImageEmbeddingService._internal();
 
-  // PE-Core 모델 (Vision + Text)
-  OrtSession? _visionSession;
-  OrtSession? _textSession;
+  // Isolate 관리
+  Isolate? _workerIsolate;
+  SendPort? _workerSendPort;
+  ReceivePort? _mainReceivePort;
+  
+  // 요청-응답 매칭
+  final Map<String, Completer<IsolateResponse>> _pendingRequests = {};
+  int _requestCounter = 0;
 
   ModelStatus _status = ModelStatus.notLoaded;
   String? _errorMessage;
@@ -49,103 +90,134 @@ class ImageEmbeddingService extends ChangeNotifier {
   static const int embeddingDim = 1024; // PE-Core-L14는 1024차원
   static const int maxTokens = 32; // CLIP 텍스트 최대 토큰 수
 
-  // 🚀 동시 실행 제한 (UI 블로킹 방지)
-  static const int _maxConcurrentInferences = 3; // 최대 3개까지 동시 실행
-  int _runningInferences = 0;
-
-  /// 앱 시작 시 모델 로드
+  /// 앱 시작 시 Worker Isolate 생성 및 모델 로드
   Future<void> initialize() async {
     try {
       _status = ModelStatus.loading;
       _errorMessage = null;
       notifyListeners();
 
-      debugPrint('PE-Core ONNX 모델 로드 중...');
+      debugPrint('🚀 Worker Isolate 생성 중...');
 
-      // Vision Encoder 로드
-      try {
-        final visionModelData = await rootBundle.load(
-          'assets/models/pe_core_vision_l14.onnx',
-        );
+      // ReceivePort 생성 (메인 스레드에서 메시지 수신)
+      _mainReceivePort = ReceivePort();
 
-        final sessionOptions = OrtSessionOptions();
+      // 메인 스레드에서 모델 데이터 로드
+      debugPrint('📦 메인 스레드에서 모델 데이터 로드 중...');
+      
+      final visionModelData = await rootBundle.load(
+        'assets/models/pe_core_vision_l14.onnx',
+      );
+      
+      final textModelData = await rootBundle.load(
+        'assets/models/pe_core_text_l14.onnx',
+      );
+      
+      debugPrint('✅ 모델 데이터 로드 완료');
 
-        // 🚀 GPU 가속 자동 활성화!
-        // CUDA → DirectML → ROCm → CoreML → NNAPI → CPU 순으로 자동 선택
-        try {
-          sessionOptions.appendDefaultProviders();
-          debugPrint('✅ GPU 가속 활성화');
-        } catch (e) {
-          debugPrint('⚠️  GPU 가속 실패, CPU 사용: $e');
+      // Worker Isolate 생성 (모델 데이터와 SendPort 함께 전달)
+      _workerIsolate = await Isolate.spawn(
+        _isolateEntryPoint,
+        {
+          'sendPort': _mainReceivePort!.sendPort,
+          'visionModelData': visionModelData.buffer.asUint8List(),
+          'textModelData': textModelData.buffer.asUint8List(),
+        },
+        debugName: 'ImageEmbeddingWorker',
+      );
+
+      // Worker로부터 메시지 수신 대기
+      final completer = Completer<SendPort>();
+      bool sendPortReceived = false;
+      
+      _mainReceivePort!.listen((message) {
+        if (message is SendPort && !sendPortReceived) {
+          // 첫 메시지: Worker의 SendPort
+          sendPortReceived = true;
+          _workerSendPort = message;
+          completer.complete(message);
+        } else if (message is IsolateResponse) {
+          // 일반 응답 처리
+          final responseCompleter = _pendingRequests.remove(message.id);
+          responseCompleter?.complete(message);
         }
+      });
 
-        _visionSession = OrtSession.fromBuffer(
-          visionModelData.buffer.asUint8List(),
-          sessionOptions,
-        );
+      // Worker SendPort 수신 대기 (타임아웃 10초)
+      _workerSendPort = await completer.future.timeout(
+        const Duration(seconds: 10),
+        onTimeout: () => throw Exception('Worker Isolate 초기화 타임아웃'),
+      );
 
-        debugPrint('✅ Vision Encoder 로드 완료');
-        _logSessionInfo(_visionSession!, 'Vision');
-      } catch (e) {
-        debugPrint('⚠️  Vision Encoder 로드 실패: $e');
-        throw Exception('Vision 모델을 찾을 수 없습니다. '
-            'tools/README.md를 참고하여 모델을 변환하고 assets/models/에 추가하세요.');
-      }
+      debugPrint('✅ Worker Isolate 생성 완료');
 
-      // Text Encoder 로드
-      try {
-        final textModelData = await rootBundle.load(
-          'assets/models/pe_core_text_l14.onnx',
-        );
+      // Worker에게 모델 초기화 요청
+      debugPrint('📦 PE-Core ONNX 모델 로드 중...');
+      final response = await _sendRequest(
+        IsolateRequestType.initialize,
+        {},
+      );
 
-        final sessionOptions = OrtSessionOptions();
-
-        // 🚀 GPU 가속 자동 활성화!
-        try {
-          sessionOptions.appendDefaultProviders();
-          debugPrint('✅ GPU 가속 활성화');
-        } catch (e) {
-          debugPrint('⚠️  GPU 가속 실패, CPU 사용: $e');
-        }
-
-        _textSession = OrtSession.fromBuffer(
-          textModelData.buffer.asUint8List(),
-          sessionOptions,
-        );
-
-        debugPrint('✅ Text Encoder 로드 완료');
-        _logSessionInfo(_textSession!, 'Text');
-      } catch (e) {
-        debugPrint('⚠️  Text Encoder 로드 실패: $e');
-        throw Exception('Text 모델을 찾을 수 없습니다. '
-            'tools/README.md를 참고하여 모델을 변환하고 assets/models/에 추가하세요.');
+      if (!response.success) {
+        throw Exception(response.error ?? '모델 초기화 실패');
       }
 
       _status = ModelStatus.loaded;
-      debugPrint('✅ PE-Core 모델 초기화 완료');
+      debugPrint('✅ PE-Core 모델 초기화 완료 (Isolate)');
       notifyListeners();
     } catch (e) {
       _status = ModelStatus.error;
       _errorMessage = e.toString();
       debugPrint('❌ 모델 초기화 실패: $e');
+      
+      // 실패 시 정리
+      _workerIsolate?.kill(priority: Isolate.immediate);
+      _workerIsolate = null;
+      _mainReceivePort?.close();
+      _mainReceivePort = null;
+      _workerSendPort = null;
+      
       notifyListeners();
       rethrow;
     }
   }
 
-  /// 모델 정보 로깅
-  void _logSessionInfo(OrtSession session, String name) {
-    debugPrint('=== $name Encoder 정보 ===');
-    debugPrint('입력:');
-    for (var input in session.inputNames) {
-      debugPrint('  - $input');
+  /// Worker Isolate에 요청 전송 및 응답 대기
+  Future<IsolateResponse> _sendRequest(
+    IsolateRequestType type,
+    Map<String, dynamic> data,
+  ) async {
+    if (_workerSendPort == null) {
+      throw Exception('Worker Isolate가 초기화되지 않았습니다');
     }
-    debugPrint('출력:');
-    for (var output in session.outputNames) {
-      debugPrint('  - $output');
+
+    final requestId = 'req_${_requestCounter++}';
+    final completer = Completer<IsolateResponse>();
+    _pendingRequests[requestId] = completer;
+
+    final request = IsolateRequest(
+      id: requestId,
+      type: type,
+      data: data,
+    );
+
+    _workerSendPort!.send(request);
+
+    // 응답 대기 (타임아웃 60초)
+    try {
+      return await completer.future.timeout(
+        const Duration(seconds: 60),
+        onTimeout: () {
+          _pendingRequests.remove(requestId);
+          throw TimeoutException('Worker Isolate 응답 타임아웃');
+        },
+      );
+    } catch (e) {
+      _pendingRequests.remove(requestId);
+      rethrow;
     }
-    debugPrint('====================');
   }
+
 
   /// 이미지 전처리 (PE-Core: 336x336, ImageNet 정규화)
   /// 백그라운드에서 실행 가능한 독립 함수
@@ -153,8 +225,11 @@ class ImageEmbeddingService extends ChangeNotifier {
     // 이미지 디코딩
     final image = img.decodeImage(imageBytes);
     if (image == null) {
-      throw Exception('이미지 디코딩 실패');
+      debugPrint('❌ 이미지 디코딩 실패: ${imageBytes.length} bytes');
+      throw Exception('이미지 디코딩 실패 (크기: ${imageBytes.length} bytes)');
     }
+    
+    debugPrint('✅ 이미지 디코딩 성공: ${image.width}x${image.height}');
 
     // 336x336로 리사이즈 (center crop)
     final resized = img.copyResize(image, width: imageSize, height: imageSize);
@@ -188,7 +263,7 @@ class ImageEmbeddingService extends ChangeNotifier {
   }
 
   /// 임베딩 정규화 (L2 normalization)
-  List<double> _normalizeEmbedding(List<double> embedding) {
+  static List<double> _normalizeEmbedding(List<double> embedding) {
     final magnitude = sqrt(
       embedding.fold<double>(0.0, (sum, val) => sum + val * val),
     );
@@ -199,87 +274,59 @@ class ImageEmbeddingService extends ChangeNotifier {
     return embedding;
   }
 
-  /// 큐 기반 추론 실행 (동시 실행 제한)
-  Future<T> _runInferenceWithQueue<T>(Future<T> Function() task) async {
-    // 현재 실행 중인 작업이 최대치를 초과하면 대기
-    while (_runningInferences >= _maxConcurrentInferences) {
-      await Future.delayed(const Duration(milliseconds: 100));
-    }
-
-    _runningInferences++;
-    try {
-      return await task();
-    } finally {
-      _runningInferences--;
-      debugPrint('🔄 추론 완료 (실행 중: $_runningInferences)');
-    }
-  }
-
   /// 이미지를 임베딩 벡터로 변환
   /// URL에서 이미지를 다운로드하고 임베딩 생성
   Future<List<double>> getImageEmbeddingFromUrl(String imageUrl) async {
-    return _runInferenceWithQueue(() async {
-      try {
-        final response = await http.get(Uri.parse(imageUrl));
-        if (response.statusCode == 200) {
-          return await _getImageEmbeddingInternal(response.bodyBytes);
-        } else {
-          throw Exception('이미지 다운로드 실패: ${response.statusCode}');
-        }
-      } catch (e) {
-        debugPrint('이미지 다운로드 실패: $e');
-        rethrow;
+    try {
+      final response = await http.get(Uri.parse(imageUrl));
+      if (response.statusCode == 200) {
+        debugPrint('✅ 이미지 다운로드 성공: ${response.bodyBytes.length} bytes');
+        return await getImageEmbedding(response.bodyBytes);
+      } else {
+        debugPrint('  - 응답 본문 전체:\n${response.body}');
+        throw Exception('이미지 다운로드 실패 (Status ${response.statusCode})');
       }
-    });
+    } catch (e, stackTrace) {
+      debugPrint('❌ getImageEmbeddingFromUrl 에러:');
+      debugPrint('  - URL: $imageUrl');
+      debugPrint('  - 에러: $e');
+      debugPrint('  - 스택 트레이스: $stackTrace');
+      rethrow;
+    }
   }
 
-  /// 공개 API: 큐를 통한 이미지 임베딩 생성
+  /// 공개 API: 이미지 임베딩 생성 (Worker Isolate에서 처리)
   Future<List<double>> getImageEmbedding(Uint8List imageBytes) async {
-    return _runInferenceWithQueue(() => _getImageEmbeddingInternal(imageBytes));
-  }
-
-  /// 내부 메서드: 실제 임베딩 생성 로직
-  Future<List<double>> _getImageEmbeddingInternal(Uint8List imageBytes) async {
     if (!isModelReady) {
-      throw Exception('모델이 준비되지 않았습니다.');
+      throw Exception('모델이 준비되지 않았습니다. 현재 상태: $_status');
     }
 
     try {
-      // 🚀 이미지 전처리를 백그라운드 isolate에서 수행 (UI 블로킹 방지)
-      final input = await compute(_preprocessImage, imageBytes);
-
-      // ONNX Runtime 입력 생성
-      final inputOrt = OrtValueTensor.createTensorWithDataList(
-        input,
-        [1, 3, imageSize, imageSize],
+      debugPrint('🔄 이미지 임베딩 생성 시작 (크기: ${imageBytes.length} bytes)');
+      final response = await _sendRequest(
+        IsolateRequestType.processImage,
+        {'imageBytes': imageBytes},
       );
 
-      // 추론
-      final inputs = {_visionSession!.inputNames.first: inputOrt};
-      final outputs = _visionSession!.run(
-        OrtRunOptions(),
-        inputs,
-      );
-
-      // 출력 추출
-      final embedding = (outputs[0]?.value as List<List<double>>)[0];
-
-      // 정리
-      inputOrt.release();
-      for (var output in outputs) {
-        output?.release();
+      if (!response.success) {
+        throw Exception(response.error ?? '이미지 임베딩 생성 실패');
       }
 
-      // 벡터 정규화
-      return _normalizeEmbedding(embedding);
-    } catch (e) {
-      debugPrint('이미지 임베딩 생성 실패: $e');
+      final embedding = List<double>.from(response.result as List);
+      debugPrint('✅ 이미지 임베딩 생성 완료 (차원: ${embedding.length})');
+      return embedding;
+    } catch (e, stackTrace) {
+      debugPrint('❌ getImageEmbedding 에러:');
+      debugPrint('  - 이미지 크기: ${imageBytes.length} bytes');
+      debugPrint('  - 모델 상태: $_status');
+      debugPrint('  - 에러: $e');
+      debugPrint('  - 스택 트레이스: $stackTrace');
       rethrow;
     }
   }
 
   /// 텍스트를 토큰으로 변환 (간단한 CLIP tokenizer)
-  Int64List _tokenizeText(String text) {
+  static Int64List _tokenizeText(String text) {
     // 간단한 토큰화 (실제로는 CLIP BPE tokenizer 사용해야 함)
     // 여기서는 placeholder로 구현
 
@@ -309,46 +356,32 @@ class ImageEmbeddingService extends ChangeNotifier {
     return Int64List.fromList(tokens.take(maxTokens).toList());
   }
 
-  /// 텍스트를 임베딩 벡터로 변환
+  /// 텍스트를 임베딩 벡터로 변환 (Worker Isolate에서 처리)
   Future<List<double>> getTextEmbedding(String text) async {
     if (!isModelReady) {
-      throw Exception('모델이 준비되지 않았습니다.');
-    }
-
-    if (_textSession == null) {
-      throw Exception('Text Encoder가 로드되지 않았습니다.');
+      throw Exception('모델이 준비되지 않았습니다. 현재 상태: $_status');
     }
 
     try {
-      // 텍스트 토큰화
-      final tokens = _tokenizeText(text);
-
-      // ONNX Runtime 입력 생성
-      final inputOrt = OrtValueTensor.createTensorWithDataList(
-        tokens,
-        [1, maxTokens],
+      debugPrint('🔄 텍스트 임베딩 생성 시작 (길이: ${text.length} chars)');
+      final response = await _sendRequest(
+        IsolateRequestType.processText,
+        {'text': text},
       );
 
-      // 추론
-      final inputs = {_textSession!.inputNames.first: inputOrt};
-      final outputs = _textSession!.run(
-        OrtRunOptions(),
-        inputs,
-      );
-
-      // 출력 추출
-      final embedding = (outputs[0]?.value as List<List<double>>)[0];
-
-      // 정리
-      inputOrt.release();
-      for (var output in outputs) {
-        output?.release();
+      if (!response.success) {
+        throw Exception(response.error ?? '텍스트 임베딩 생성 실패');
       }
 
-      // 벡터 정규화
-      return _normalizeEmbedding(embedding);
-    } catch (e) {
-      debugPrint('텍스트 임베딩 생성 실패: $e');
+      final embedding = List<double>.from(response.result as List);
+      debugPrint('✅ 텍스트 임베딩 생성 완료 (차원: ${embedding.length})');
+      return embedding;
+    } catch (e, stackTrace) {
+      debugPrint('❌ getTextEmbedding 에러:');
+      debugPrint('  - 텍스트: "$text"');
+      debugPrint('  - 모델 상태: $_status');
+      debugPrint('  - 에러: $e');
+      debugPrint('  - 스택 트레이스: $stackTrace');
       rethrow;
     }
   }
@@ -375,10 +408,12 @@ class ImageEmbeddingService extends ChangeNotifier {
     Map<int, List<double>> galleryEmbeddings,
   ) async {
     if (!isModelReady) {
-      throw Exception('모델이 준비되지 않았습니다.');
+      throw Exception('모델이 준비되지 않았습니다. 현재 상태: $_status');
     }
 
     try {
+      debugPrint('🔍 텍스트 검색 시작: "$query" (갤러리 ${galleryEmbeddings.length}개)');
+      
       // 텍스트 임베딩 생성
       final textEmb = await getTextEmbedding(query);
 
@@ -396,9 +431,14 @@ class ImageEmbeddingService extends ChangeNotifier {
       // 유사도 높은 순으로 정렬
       results.sort((a, b) => b.similarity.compareTo(a.similarity));
 
+      debugPrint('✅ 텍스트 검색 완료: ${results.length}개 결과');
       return results;
-    } catch (e) {
-      debugPrint('텍스트 검색 실패: $e');
+    } catch (e, stackTrace) {
+      debugPrint('❌ searchByText 에러:');
+      debugPrint('  - 쿼리: "$query"');
+      debugPrint('  - 갤러리 개수: ${galleryEmbeddings.length}');
+      debugPrint('  - 에러: $e');
+      debugPrint('  - 스택 트레이스: $stackTrace');
       rethrow;
     }
   }
@@ -457,9 +497,14 @@ class ImageEmbeddingService extends ChangeNotifier {
       // 0.5 이하는 거의 0에 가깝게, 0.9 이상만 높은 점수
       final adjustedScore = _adjustScore(rawSimilarity);
 
+      debugPrint('✅ 추천도 계산: $adjustedScore (원본 유사도: $rawSimilarity)');
       return adjustedScore;
-    } catch (e) {
-      debugPrint('추천도 계산 실패: $e');
+    } catch (e, stackTrace) {
+      debugPrint('❌ calculateRecommendationScore 에러:');
+      debugPrint('  - 썸네일 URL: $thumbnailUrl');
+      debugPrint('  - 즐겨찾기 개수: ${favoriteEmbeddings.length}');
+      debugPrint('  - 에러: $e');
+      debugPrint('  - 스택 트레이스: $stackTrace');
       return 0.0;
     }
   }
@@ -562,9 +607,262 @@ class ImageEmbeddingService extends ChangeNotifier {
   }
 
   /// 리소스 정리
+  @override
   void dispose() {
-    _visionSession?.release();
-    _textSession?.release();
+    // Worker Isolate 종료
+    if (_workerIsolate != null) {
+      try {
+        _sendRequest(IsolateRequestType.dispose, {}).timeout(
+          const Duration(seconds: 2),
+          onTimeout: () {
+            debugPrint('⚠️  Isolate dispose 타임아웃');
+            return IsolateResponse(id: '', success: true);
+          },
+        );
+      } catch (e) {
+        debugPrint('⚠️  Isolate dispose 실패: $e');
+      }
+
+      _workerIsolate!.kill(priority: Isolate.immediate);
+      _workerIsolate = null;
+    }
+
+    _mainReceivePort?.close();
+    _mainReceivePort = null;
+    _workerSendPort = null;
+    _pendingRequests.clear();
+
     super.dispose();
+  }
+
+  /// Worker Isolate 진입점
+  static void _isolateEntryPoint(Map<String, dynamic> params) async {
+    final mainSendPort = params['sendPort'] as SendPort;
+    final visionModelBytes = params['visionModelData'] as Uint8List;
+    final textModelBytes = params['textModelData'] as Uint8List;
+
+    // Worker의 ReceivePort 생성
+    final workerReceivePort = ReceivePort();
+
+    // 메인 스레드에 Worker의 SendPort 전송
+    mainSendPort.send(workerReceivePort.sendPort);
+
+    // ONNX 세션 (Isolate 내부에서만 사용)
+    OrtSession? visionSession;
+    OrtSession? textSession;
+
+    try {
+      // 메시지 수신 및 처리 루프
+      await for (final message in workerReceivePort) {
+        if (message is! IsolateRequest) continue;
+
+        final request = message;
+        IsolateResponse response;
+
+        try {
+          switch (request.type) {
+            case IsolateRequestType.initialize:
+              // 모델 초기화
+              try {
+                debugPrint('[Worker] PE-Core 모델 로드 시작...');
+
+                // Vision Encoder 로드
+                final visionSessionOptions = OrtSessionOptions();
+                try {
+                  visionSessionOptions.appendDefaultProviders();
+                  debugPrint('[Worker] ✅ GPU 가속 활성화 (Vision)');
+                } catch (e) {
+                  debugPrint('[Worker] ⚠️  GPU 가속 실패, CPU 사용 (Vision): $e');
+                }
+
+                visionSession = OrtSession.fromBuffer(
+                  visionModelBytes,
+                  visionSessionOptions,
+                );
+
+                debugPrint('[Worker] ✅ Vision Encoder 로드 완료');
+
+                // Text Encoder 로드
+                final textSessionOptions = OrtSessionOptions();
+                try {
+                  textSessionOptions.appendDefaultProviders();
+                  debugPrint('[Worker] ✅ GPU 가속 활성화 (Text)');
+                } catch (e) {
+                  debugPrint('[Worker] ⚠️  GPU 가속 실패, CPU 사용 (Text): $e');
+                }
+
+                textSession = OrtSession.fromBuffer(
+                  textModelBytes,
+                  textSessionOptions,
+                );
+
+                debugPrint('[Worker] ✅ Text Encoder 로드 완료');
+                debugPrint('[Worker] ✅ PE-Core 모델 초기화 완료');
+
+                response = IsolateResponse(
+                  id: request.id,
+                  success: true,
+                );
+              } catch (e) {
+                debugPrint('[Worker] ❌ 모델 초기화 실패: $e');
+                response = IsolateResponse(
+                  id: request.id,
+                  success: false,
+                  error: e.toString(),
+                );
+              }
+              break;
+
+            case IsolateRequestType.processImage:
+              // 이미지 임베딩 생성
+              try {
+                if (visionSession == null) {
+                  throw Exception('Vision 모델이 로드되지 않았습니다');
+                }
+
+                final imageBytes = request.data['imageBytes'] as Uint8List;
+
+                // 이미지 전처리
+                final input = _preprocessImage(imageBytes);
+
+                // ONNX Runtime 입력 생성
+                final inputOrt = OrtValueTensor.createTensorWithDataList(
+                  input,
+                  [1, 3, imageSize, imageSize],
+                );
+
+                // 추론
+                final inputs = {visionSession.inputNames.first: inputOrt};
+                final outputs = visionSession.run(
+                  OrtRunOptions(),
+                  inputs,
+                );
+
+                // 출력 추출
+                final embedding = (outputs[0]?.value as List<List<double>>)[0];
+
+                // 정리
+                inputOrt.release();
+                for (var output in outputs) {
+                  output?.release();
+                }
+
+                // 벡터 정규화
+                final normalized = _normalizeEmbedding(embedding);
+
+                response = IsolateResponse(
+                  id: request.id,
+                  success: true,
+                  result: normalized,
+                );
+              } catch (e) {
+                debugPrint('[Worker] ❌ 이미지 임베딩 생성 실패: $e');
+                response = IsolateResponse(
+                  id: request.id,
+                  success: false,
+                  error: e.toString(),
+                );
+              }
+              break;
+
+            case IsolateRequestType.processText:
+              // 텍스트 임베딩 생성
+              try {
+                if (textSession == null) {
+                  throw Exception('Text 모델이 로드되지 않았습니다');
+                }
+
+                final text = request.data['text'] as String;
+
+                // 텍스트 토큰화
+                final tokens = _tokenizeText(text);
+
+                // ONNX Runtime 입력 생성
+                final inputOrt = OrtValueTensor.createTensorWithDataList(
+                  tokens,
+                  [1, maxTokens],
+                );
+
+                // 추론
+                final inputs = {textSession.inputNames.first: inputOrt};
+                final outputs = textSession.run(
+                  OrtRunOptions(),
+                  inputs,
+                );
+
+                // 출력 추출
+                final embedding = (outputs[0]?.value as List<List<double>>)[0];
+
+                // 정리
+                inputOrt.release();
+                for (var output in outputs) {
+                  output?.release();
+                }
+
+                // 벡터 정규화
+                final normalized = _normalizeEmbedding(embedding);
+
+                response = IsolateResponse(
+                  id: request.id,
+                  success: true,
+                  result: normalized,
+                );
+              } catch (e) {
+                debugPrint('[Worker] ❌ 텍스트 임베딩 생성 실패: $e');
+                response = IsolateResponse(
+                  id: request.id,
+                  success: false,
+                  error: e.toString(),
+                );
+              }
+              break;
+
+            case IsolateRequestType.dispose:
+              // 리소스 정리
+              try {
+                debugPrint('[Worker] 🧹 리소스 정리 중...');
+                visionSession?.release();
+                textSession?.release();
+                visionSession = null;
+                textSession = null;
+
+                response = IsolateResponse(
+                  id: request.id,
+                  success: true,
+                );
+
+                mainSendPort.send(response);
+                workerReceivePort.close();
+                debugPrint('[Worker] ✅ Worker Isolate 종료');
+                return; // Isolate 종료
+              } catch (e) {
+                debugPrint('[Worker] ⚠️  리소스 정리 실패: $e');
+                response = IsolateResponse(
+                  id: request.id,
+                  success: false,
+                  error: e.toString(),
+                );
+              }
+              break;
+          }
+        } catch (e) {
+          debugPrint('[Worker] ❌ 요청 처리 실패: $e');
+          response = IsolateResponse(
+            id: request.id,
+            success: false,
+            error: e.toString(),
+          );
+        }
+
+        // 응답 전송
+        mainSendPort.send(response);
+      }
+    } catch (e) {
+      debugPrint('[Worker] ❌ Worker Isolate 크래시: $e');
+      // 크래시 시 리소스 정리
+      visionSession?.release();
+      textSession?.release();
+      workerReceivePort.close();
+    }
   }
 }

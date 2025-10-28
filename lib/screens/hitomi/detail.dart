@@ -68,6 +68,8 @@ class _HitomiDetailScreenState extends State<HitomiDetailScreen> {
     );
 
     try {
+      debugPrint('🔍 유사 이미지 검색 시작: 갤러리 $currentId');
+      
       final queryEmbedding = store.galleryEmbeddings[currentId]!;
 
       // 유사한 이미지 찾기 (현재 이미지 제외)
@@ -75,12 +77,16 @@ class _HitomiDetailScreenState extends State<HitomiDetailScreen> {
           Map<int, List<double>>.from(store.galleryEmbeddings);
       otherEmbeddings.remove(currentId);
 
+      debugPrint('  - 검색 대상: ${otherEmbeddings.length}개 갤러리');
+
       final results = embeddingService.findSimilarImages(
         queryEmbedding,
         otherEmbeddings,
         topK: 50,
         minSimilarity: 0.5,
       );
+
+      debugPrint('✅ 유사 이미지 검색 완료: ${results.length}개 발견');
 
       // 로딩 다이얼로그 닫기
       Navigator.of(context).pop();
@@ -169,12 +175,20 @@ class _HitomiDetailScreenState extends State<HitomiDetailScreen> {
           ),
         ),
       );
-    } catch (e) {
+    } catch (e, stackTrace) {
+      debugPrint('❌ 유사 이미지 검색 에러:');
+      debugPrint('  - 갤러리 ID: $currentId');
+      debugPrint('  - 에러: $e');
+      debugPrint('  - 스택 트레이스: $stackTrace');
+      
       // 로딩 다이얼로그 닫기
       Navigator.of(context).pop();
 
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('오류 발생: $e')),
+        SnackBar(
+          content: Text('오류 발생: $e'),
+          duration: const Duration(seconds: 5),
+        ),
       );
     }
   }
@@ -353,7 +367,11 @@ class _HitomiDetailScreenState extends State<HitomiDetailScreen> {
               try {
                 Share.share(
                     'https://hitomiviewer.pages.dev/#/hitomi/${widget.detail['id']}');
-              } catch (e) {
+              } catch (e, stackTrace) {
+                debugPrint('⚠️  공유 실패, 클립보드로 복사:');
+                debugPrint('  - 에러: $e');
+                debugPrint('  - 스택 트레이스: $stackTrace');
+                
                 Clipboard.setData(
                   ClipboardData(
                     text:

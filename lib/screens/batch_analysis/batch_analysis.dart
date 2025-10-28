@@ -448,6 +448,8 @@ class _BatchAnalysisScreenState extends State<BatchAnalysisScreen> {
       });
 
       try {
+        debugPrint('🔄 갤러리 $galleryId 분석 시작');
+        
         // 갤러리 정보 가져오기
         final detail = await fetchDetail(galleryId.toString());
         final files = detail['files'] as List;
@@ -462,11 +464,16 @@ class _BatchAnalysisScreenState extends State<BatchAnalysisScreen> {
             ? 'https://$API_HOST/api/hitomi/images/preview/$hash.webp'
             : 'https://$API_HOST/api/hitomi/images/$hash.webp';
 
+        debugPrint('  - 이미지 URL: $imageUrl');
+
         // 이미지 다운로드
         final response = await http.get(Uri.parse(imageUrl));
         if (response.statusCode != 200) {
-          throw Exception('이미지 다운로드 실패: ${response.statusCode}');
+          debugPrint('  - 응답 본문 전체:\n${response.body}');
+          throw Exception('이미지 다운로드 실패 (Status ${response.statusCode})');
         }
+
+        debugPrint('  - 이미지 다운로드 성공: ${response.bodyBytes.length} bytes');
 
         // 임베딩 생성
         final embedding = await embeddingService.getImageEmbedding(
@@ -480,10 +487,17 @@ class _BatchAnalysisScreenState extends State<BatchAnalysisScreen> {
           modelName: 'PE-Core-L14',
         );
 
+        debugPrint('✅ 갤러리 $galleryId 분석 완료');
+        
         setState(() {
           _analysisStatus[galleryId] = '분석 완료';
         });
-      } catch (e) {
+      } catch (e, stackTrace) {
+        debugPrint('❌ 갤러리 $galleryId 분석 실패:');
+        debugPrint('  - 갤러리 ID: $galleryId');
+        debugPrint('  - 에러: $e');
+        debugPrint('  - 스택 트레이스: $stackTrace');
+        
         _failedGalleries.add(galleryId);
         setState(() {
           _analysisStatus[galleryId] = '실패: $e';

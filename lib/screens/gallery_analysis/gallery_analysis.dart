@@ -216,16 +216,23 @@ class _GalleryAnalysisScreenState extends State<GalleryAnalysisScreen> {
     });
 
     try {
+      debugPrint('🔄 이미지 $index 분석 시작: $imageUrl');
+      
       // 이미지 다운로드
       final response = await http.get(Uri.parse(imageUrl));
       if (response.statusCode != 200) {
-        throw Exception('이미지 다운로드 실패: ${response.statusCode}');
+        debugPrint('  - 응답 본문 전체:\n${response.body}');
+        throw Exception('이미지 다운로드 실패 (Status ${response.statusCode})');
       }
+
+      debugPrint('  - 다운로드 성공: ${response.bodyBytes.length} bytes');
 
       // 임베딩 생성
       final embedding = await embeddingService.getImageEmbedding(
         response.bodyBytes,
       );
+
+      debugPrint('✅ 이미지 $index 분석 완료 (임베딩 차원: ${embedding.length})');
 
       setState(() {
         analyzed[index] = true;
@@ -236,14 +243,22 @@ class _GalleryAnalysisScreenState extends State<GalleryAnalysisScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('이미지 ${index + 1} 분석 완료')),
       );
-    } catch (e) {
+    } catch (e, stackTrace) {
+      debugPrint('❌ 이미지 $index 분석 실패:');
+      debugPrint('  - URL: $imageUrl');
+      debugPrint('  - 에러: $e');
+      debugPrint('  - 스택 트레이스: $stackTrace');
+      
       setState(() {
         analysisErrors[index] = e.toString();
         analyzing[index] = false;
       });
 
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('분석 실패: $e')),
+        SnackBar(
+          content: Text('분석 실패 (이미지 ${index + 1}): $e'),
+          duration: const Duration(seconds: 5),
+        ),
       );
     }
   }

@@ -21,21 +21,33 @@ void main() async {
 
   // ONNX Runtime 환경 초기화
   try {
+    debugPrint('🚀 ONNX Runtime 환경 초기화 중...');
     OrtEnv.instance.init();
     debugPrint('✅ ONNX Runtime 환경 초기화 완료');
-  } catch (e) {
-    debugPrint('⚠️  ONNX Runtime 초기화 실패: $e');
+  } catch (e, stackTrace) {
+    debugPrint('❌ ONNX Runtime 초기화 실패:');
+    debugPrint('  - 에러: $e');
+    debugPrint('  - 스택 트레이스: $stackTrace');
+    debugPrint('  - 앱은 계속 실행되지만 AI 기능은 사용할 수 없습니다.');
   }
 
   // PE-Core 모델 초기화
   final embeddingService = ImageEmbeddingService();
   try {
+    debugPrint('🚀 PE-Core 모델 초기화 중...');
     await embeddingService.initialize();
-  } catch (e) {
-    debugPrint('모델 초기화 실패 (계속 진행): $e');
+    debugPrint('✅ PE-Core 모델 초기화 완료');
+  } catch (e, stackTrace) {
+    debugPrint('❌ PE-Core 모델 초기화 실패:');
+    debugPrint('  - 에러: $e');
+    debugPrint('  - 스택 트레이스: $stackTrace');
+    debugPrint('  - 모델 상태: ${embeddingService.status}');
+    debugPrint('  - 에러 메시지: ${embeddingService.errorMessage ?? "없음"}');
+    debugPrint('  - 앱은 계속 실행되지만 이미지 분석 기능은 사용할 수 없습니다.');
     // 모델 로드 실패해도 앱은 계속 실행
   }
 
+  debugPrint('🚀 앱 실행 중...');
   runApp(App());
 }
 

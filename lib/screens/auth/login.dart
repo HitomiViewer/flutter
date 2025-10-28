@@ -1,4 +1,5 @@
 import 'package:auto_route/auto_route.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:hitomiviewer/services/auth.dart';
 import 'package:hitomiviewer/store.dart';
@@ -25,9 +26,15 @@ class _LoginScreenState extends State<LoginScreen> {
       context.read<Store>().setAccessToken(token.accessToken);
       context.read<Store>().setRefreshToken(token.refreshToken);
       context.router.pop();
-    } catch (e) {
+    } catch (e, stackTrace) {
+      debugPrint('❌ 로그인 에러:');
+      debugPrint('  - ID: $id');
+      debugPrint('  - 에러: $e');
+      debugPrint('  - 스택 트레이스: $stackTrace');
+      
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
         content: Text(e.toString()),
+        duration: const Duration(seconds: 5),
       ));
     }
   }
