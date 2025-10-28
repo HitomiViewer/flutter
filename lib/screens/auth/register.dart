@@ -35,6 +35,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
         content: Text(e.toString()),
         duration: const Duration(seconds: 5),
+        action: SnackBarAction(
+          label: '재시도',
+          onPressed: () => regist(id, password),
+        ),
       ));
     }
   }

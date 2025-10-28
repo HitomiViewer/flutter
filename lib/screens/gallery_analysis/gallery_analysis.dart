@@ -42,6 +42,13 @@ class _GalleryAnalysisScreenState extends State<GalleryAnalysisScreen> {
       appBar: AppBar(
         title: const Text('갤러리 분석'),
         actions: [
+          // 실패한 항목 재시도 버튼
+          if (analysisErrors.values.where((e) => e != null).isNotEmpty)
+            IconButton(
+              icon: const Icon(Icons.refresh),
+              tooltip: '실패한 항목 재시도',
+              onPressed: _retryFailedImages,
+            ),
           // 전체 분석 버튼
           IconButton(
             icon: const Icon(Icons.play_arrow),
@@ -138,7 +145,14 @@ class _GalleryAnalysisScreenState extends State<GalleryAnalysisScreen> {
     final error = analysisErrors[index];
 
     return GestureDetector(
-      onTap: () => _analyzeImage(imageUrl, index),
+      onTap: () {
+        // 에러가 있으면 재시도, 아니면 분석
+        if (error != null) {
+          _retryImage(imageUrl, index);
+        } else if (!isAnalyzing && !isAnalyzed) {
+          _analyzeImage(imageUrl, index);
+        }
+      },
       child: Stack(
         children: [
           // 이미지
@@ -172,7 +186,19 @@ class _GalleryAnalysisScreenState extends State<GalleryAnalysisScreen> {
                 child: isAnalyzing
                     ? const CircularProgressIndicator()
                     : error != null
-                        ? const Icon(Icons.error, color: Colors.red, size: 40)
+                        ? Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              const Icon(Icons.error, color: Colors.red, size: 40),
+                              const SizedBox(height: 8),
+                              const Icon(Icons.refresh, color: Colors.white, size: 24),
+                              const SizedBox(height: 4),
+                              Text(
+                                '탭하여 재시도',
+                                style: const TextStyle(color: Colors.white, fontSize: 10),
+                              ),
+                            ],
+                          )
                         : const Icon(Icons.check_circle,
                             color: Colors.green, size: 40),
               ),
@@ -261,6 +287,99 @@ class _GalleryAnalysisScreenState extends State<GalleryAnalysisScreen> {
         ),
       );
     }
+  }
+
+  Future<void> _retryImage(String imageUrl, int index) async {
+    debugPrint('🔄 이미지 $index 재시도');
+    
+    // 에러 상태 초기화
+    setState(() {
+      analysisErrors[index] = null;
+    });
+
+    // 재분석
+    await _analyzeImage(imageUrl, index);
+  }
+
+  Future<void> _retryFailedImages() async {
+    if (!embeddingService.isModelReady) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('모델이 다운로드되지 않았습니다. 설정에서 다운로드하세요.')),
+      );
+      return;
+    }
+
+    final snapshot = await detail;
+    final files = snapshot['files'] as List;
+
+    // 실패한 이미지 인덱스 찾기
+    final failedIndices = <int>[];
+    for (var i = 0; i < files.length; i++) {
+      if (analysisErrors[i] != null) {
+        failedIndices.add(i);
+      }
+    }
+
+    if (failedIndices.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('실패한 항목이 없습니다')),
+      );
+      return;
+    }
+
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('실패한 항목 재시도'),
+        content: Text(
+          '실패한 ${failedIndices.length}장의 이미지를 다시 분석합니다.\n\n'
+          '계속하시겠습니까?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('취소'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('재시도'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm != true) return;
+
+    int successCount = 0;
+    for (final i in failedIndices) {
+      final hash = files[i]['hash'];
+      final imageUrl = useThumbnail
+          ? 'https://$API_HOST/api/hitomi/images/preview/$hash.webp'
+          : 'https://$API_HOST/api/hitomi/images/$hash.webp';
+
+      // 에러 상태 초기화
+      setState(() {
+        analysisErrors[i] = null;
+      });
+
+      await _analyzeImage(imageUrl, i);
+
+      // 성공했는지 확인
+      if (analysisErrors[i] == null && analyzed[i] == true) {
+        successCount++;
+      }
+    }
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          '재시도 완료\n'
+          '성공: $successCount개\n'
+          '실패: ${failedIndices.length - successCount}개',
+        ),
+        duration: const Duration(seconds: 5),
+      ),
+    );
   }
 
   Future<void> _analyzeAll() async {

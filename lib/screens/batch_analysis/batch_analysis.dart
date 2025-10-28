@@ -310,6 +310,21 @@ class _BatchAnalysisScreenState extends State<BatchAnalysisScreen> {
                 ),
               ),
             ] else if (_state == BatchAnalysisState.completed) ...[
+              if (_failedGalleries.isNotEmpty) ...[
+                Expanded(
+                  child: ElevatedButton.icon(
+                    onPressed: _retryFailedGalleries,
+                    icon: const Icon(Icons.refresh),
+                    label: Text('실패 항목 재시도 (${_failedGalleries.length}개)'),
+                    style: ElevatedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      backgroundColor: Colors.orange,
+                      foregroundColor: Colors.white,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+              ],
               Expanded(
                 child: ElevatedButton.icon(
                   onPressed: () => Navigator.pop(context),
@@ -550,5 +565,144 @@ class _BatchAnalysisScreenState extends State<BatchAnalysisScreen> {
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text('분석이 중지되었습니다')),
     );
+  }
+
+  Future<void> _retryFailedGalleries() async {
+    if (_failedGalleries.isEmpty) return;
+
+    // 확인 대화상자
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('실패 항목 재시도'),
+        content: Text(
+          '실패한 ${_failedGalleries.length}개의 갤러리를 다시 분석합니다.\n\n'
+          '계속하시겠습니까?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('취소'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('재시도'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm != true || !mounted) return;
+
+    // 실패한 갤러리들의 인덱스 찾기
+    final failedIndices = <int>[];
+    for (var i = 0; i < _galleryIds.length; i++) {
+      if (_failedGalleries.contains(_galleryIds[i])) {
+        failedIndices.add(i);
+        // 상태 초기화
+        _analysisStatus[_galleryIds[i]] = '대기 중';
+      }
+    }
+
+    // 실패 목록 초기화
+    _failedGalleries.clear();
+
+    setState(() {
+      _state = BatchAnalysisState.running;
+      _isPaused = false;
+      _startTime = DateTime.now();
+    });
+
+    // 실패한 항목들만 처리
+    for (final index in failedIndices) {
+      if (_isPaused || _state != BatchAnalysisState.running) {
+        break;
+      }
+
+      _currentIndex = index;
+      final galleryId = _galleryIds[index];
+      final store = context.read<Store>();
+
+      setState(() {
+        _analysisStatus[galleryId] = '재시도 중...';
+      });
+
+      try {
+        debugPrint('🔄 갤러리 $galleryId 재시도');
+        
+        // 갤러리 정보 가져오기
+        final detail = await fetchDetail(galleryId.toString());
+        final files = detail['files'] as List;
+
+        if (files.isEmpty) {
+          throw Exception('이미지가 없습니다');
+        }
+
+        // 첫 번째 이미지만 분석 (대표 이미지)
+        final hash = files[0]['hash'];
+        final imageUrl = _useThumbnail
+            ? 'https://$API_HOST/api/hitomi/images/preview/$hash.webp'
+            : 'https://$API_HOST/api/hitomi/images/$hash.webp';
+
+        debugPrint('  - 이미지 URL: $imageUrl');
+
+        // 이미지 다운로드
+        final response = await http.get(Uri.parse(imageUrl));
+        if (response.statusCode != 200) {
+          debugPrint('  - 응답 본문 전체:\n${response.body}');
+          throw Exception('이미지 다운로드 실패 (Status ${response.statusCode})');
+        }
+
+        debugPrint('  - 이미지 다운로드 성공: ${response.bodyBytes.length} bytes');
+
+        // 임베딩 생성
+        final embedding = await embeddingService.getImageEmbedding(
+          response.bodyBytes,
+        );
+
+        // 임베딩 저장
+        await store.saveGalleryEmbedding(
+          galleryId,
+          embedding,
+          modelName: 'PE-Core-L14',
+        );
+
+        debugPrint('✅ 갤러리 $galleryId 재시도 성공');
+        
+        setState(() {
+          _analysisStatus[galleryId] = '분석 완료';
+        });
+      } catch (e, stackTrace) {
+        debugPrint('❌ 갤러리 $galleryId 재시도 실패:');
+        debugPrint('  - 갤러리 ID: $galleryId');
+        debugPrint('  - 에러: $e');
+        debugPrint('  - 스택 트레이스: $stackTrace');
+        
+        _failedGalleries.add(galleryId);
+        setState(() {
+          _analysisStatus[galleryId] = '재시도 실패: $e';
+        });
+      }
+    }
+
+    if (!_isPaused && _state == BatchAnalysisState.running) {
+      setState(() {
+        _state = BatchAnalysisState.completed;
+      });
+
+      if (mounted) {
+        final successCount = failedIndices.length - _failedGalleries.length;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              '재시도 완료\n'
+              '성공: $successCount개\n'
+              '실패: ${_failedGalleries.length}개',
+            ),
+            duration: const Duration(seconds: 5),
+          ),
+        );
+      }
+    }
   }
 }

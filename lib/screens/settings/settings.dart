@@ -1,12 +1,17 @@
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:auto_route/auto_route.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_cache_manager/flutter_cache_manager.dart';
 import 'package:hitomiviewer/services/favorite.dart';
 import 'package:hitomiviewer/services/image_embedding.dart';
+import 'package:hitomiviewer/services/api_cache.dart';
 import 'package:hitomiviewer/app_router.gr.dart';
 import 'package:package_info_plus/package_info_plus.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:prompt_dialog/prompt_dialog.dart';
 import 'package:provider/provider.dart';
 import 'package:settings_ui/settings_ui.dart';
@@ -26,6 +31,8 @@ class SettingScreen extends StatefulWidget {
 class _SettingScreenState extends State<SettingScreen> {
   bool toggle = false;
   final embeddingService = ImageEmbeddingService();
+  int _imageCacheCount = 0;
+  int _imageCacheSize = 0;
 
   @override
   void initState() {
@@ -36,12 +43,45 @@ class _SettingScreenState extends State<SettingScreen> {
         setState(() {});
       }
     });
+    _loadImageCacheInfo();
   }
 
   @override
   void dispose() {
     embeddingService.removeListener(() {});
     super.dispose();
+  }
+
+  Future<void> _loadImageCacheInfo() async {
+    try {
+      // 임시 디렉토리에서 flutter_cache_manager 캐시 찾기
+      final tempDir = await getTemporaryDirectory();
+      final cacheDir = Directory('${tempDir.path}/libCachedImageData');
+      
+      int count = 0;
+      int totalSize = 0;
+      
+      if (await cacheDir.exists()) {
+        final files = cacheDir.listSync(recursive: true);
+        
+        for (final file in files) {
+          if (file is File) {
+            count++;
+            final fileSize = await file.length();
+            totalSize += fileSize;
+          }
+        }
+      }
+      
+      if (mounted) {
+        setState(() {
+          _imageCacheCount = count;
+          _imageCacheSize = totalSize;
+        });
+      }
+    } catch (e) {
+      debugPrint('이미지 캐시 정보 로드 실패: $e');
+    }
   }
 
   @override
@@ -197,6 +237,204 @@ class _SettingScreenState extends State<SettingScreen> {
                     Text('${context.read<Store>().recent.length} items'),
                 onPressed: (context) => context.router
                     .push(IdRoute(ids: context.read<Store>().recent)),
+              ),
+            ],
+          ),
+          SettingsSection(
+            title: const Text('API 캐시'),
+            tiles: [
+              // 캐시 통계
+              SettingsTile(
+                leading: const Icon(Icons.storage, color: Colors.green),
+                title: const Text('캐시 통계'),
+                description: _buildCacheStats(),
+                onPressed: null,
+              ),
+              
+              // 캐시 목록 보기
+              SettingsTile.navigation(
+                leading: const Icon(Icons.list, color: Colors.purple),
+                title: const Text('캐시 목록 보기'),
+                description: const Text('저장된 캐시 파일 상세 정보'),
+                onPressed: (context) {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const CacheListScreen(),
+                    ),
+                  );
+                },
+              ),
+              
+              // 만료된 캐시 정리
+              SettingsTile(
+                leading: const Icon(Icons.cleaning_services, color: Colors.blue),
+                title: const Text('만료된 캐시 정리'),
+                description: const Text('유효 기간이 지난 캐시만 삭제'),
+                onPressed: (context) async {
+                  final messenger = ScaffoldMessenger.of(context);
+                  try {
+                    await ApiCacheService().cleanExpired();
+                    if (mounted) {
+                      setState(() {}); // 통계 업데이트
+                      messenger.showSnackBar(
+                        const SnackBar(content: Text('만료된 캐시가 정리되었습니다')),
+                      );
+                    }
+                  } catch (e) {
+                    if (mounted) {
+                      messenger.showSnackBar(
+                        SnackBar(content: Text('캐시 정리 실패: $e')),
+                      );
+                    }
+                  }
+                },
+              ),
+              
+              // 전체 캐시 삭제
+              SettingsTile(
+                leading: const Icon(Icons.delete_forever, color: Colors.red),
+                title: const Text('전체 캐시 삭제'),
+                description: const Text('모든 API 캐시를 삭제합니다'),
+                onPressed: (context) async {
+                  final confirm = await showDialog<bool>(
+                    context: context,
+                    builder: (context) => AlertDialog(
+                      title: const Text('캐시 삭제'),
+                      content: const Text(
+                        '모든 API 캐시를 삭제하시겠습니까?\n\n'
+                        '다음 API 요청 시 다시 데이터를 받아옵니다.',
+                      ),
+                      actions: [
+                        TextButton(
+                          onPressed: () => Navigator.pop(context, false),
+                          child: const Text('취소'),
+                        ),
+                        TextButton(
+                          onPressed: () => Navigator.pop(context, true),
+                          child: const Text('삭제', style: TextStyle(color: Colors.red)),
+                        ),
+                      ],
+                    ),
+                  );
+
+                  if (confirm == true) {
+                    final messenger = ScaffoldMessenger.of(context);
+                    try {
+                      await ApiCacheService().clearAll();
+                      if (mounted) {
+                        setState(() {}); // 통계 업데이트
+                        messenger.showSnackBar(
+                          const SnackBar(content: Text('전체 캐시가 삭제되었습니다')),
+                        );
+                      }
+                    } catch (e) {
+                      if (mounted) {
+                        messenger.showSnackBar(
+                          SnackBar(content: Text('캐시 삭제 실패: $e')),
+                        );
+                      }
+                    }
+                  }
+                },
+              ),
+            ],
+          ),
+          SettingsSection(
+            title: const Text('이미지 캐시'),
+            tiles: [
+              // 이미지 캐시 통계
+              SettingsTile(
+                leading: const Icon(Icons.image, color: Colors.blue),
+                title: const Text('이미지 캐시 통계'),
+                description: Text(
+                  '${_imageCacheCount}개 파일 | ${_formatBytes(_imageCacheSize)}',
+                  style: TextStyle(color: Colors.grey[600]),
+                ),
+                onPressed: null,
+              ),
+              
+              // 이미지 캐시 목록 보기
+              SettingsTile.navigation(
+                leading: const Icon(Icons.photo_library, color: Colors.purple),
+                title: const Text('이미지 캐시 목록 보기'),
+                description: const Text('저장된 이미지 파일 상세 정보'),
+                onPressed: (context) {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const ImageCacheListScreen(),
+                    ),
+                  );
+                },
+              ),
+              
+              // 이미지 캐시 새로고침
+              SettingsTile(
+                leading: const Icon(Icons.refresh, color: Colors.green),
+                title: const Text('캐시 정보 새로고침'),
+                description: const Text('캐시 통계 업데이트'),
+                onPressed: (context) async {
+                  await _loadImageCacheInfo();
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('캐시 정보가 업데이트되었습니다')),
+                    );
+                  }
+                },
+              ),
+              
+              // 이미지 캐시 전체 삭제
+              SettingsTile(
+                leading: const Icon(Icons.delete_sweep, color: Colors.red),
+                title: const Text('이미지 캐시 삭제'),
+                description: const Text('모든 이미지 캐시를 삭제합니다'),
+                onPressed: (context) async {
+                  final confirm = await showDialog<bool>(
+                    context: context,
+                    builder: (context) => AlertDialog(
+                      title: const Text('이미지 캐시 삭제'),
+                      content: Text(
+                        '모든 이미지 캐시를 삭제하시겠습니까?\n\n'
+                        '${_imageCacheCount}개 파일 (${_formatBytes(_imageCacheSize)})\n\n'
+                        '다음 이미지 로드 시 다시 다운로드됩니다.',
+                      ),
+                      actions: [
+                        TextButton(
+                          onPressed: () => Navigator.pop(context, false),
+                          child: const Text('취소'),
+                        ),
+                        TextButton(
+                          onPressed: () => Navigator.pop(context, true),
+                          child: const Text('삭제', style: TextStyle(color: Colors.red)),
+                        ),
+                      ],
+                    ),
+                  );
+
+                  if (confirm == true) {
+                    final messenger = ScaffoldMessenger.of(context);
+                    try {
+                      await DefaultCacheManager().emptyCache();
+                      await CachedNetworkImage.evictFromCache(
+                        '', // 빈 URL로 호출하면 전체 캐시가 제거됨
+                      );
+                      await _loadImageCacheInfo();
+                      
+                      if (mounted) {
+                        messenger.showSnackBar(
+                          const SnackBar(content: Text('이미지 캐시가 삭제되었습니다')),
+                        );
+                      }
+                    } catch (e) {
+                      if (mounted) {
+                        messenger.showSnackBar(
+                          SnackBar(content: Text('이미지 캐시 삭제 실패: $e')),
+                        );
+                      }
+                    }
+                  }
+                },
               ),
             ],
           ),
@@ -627,6 +865,32 @@ class _SettingScreenState extends State<SettingScreen> {
     );
   }
 
+  Widget _buildCacheStats() {
+    final stats = ApiCacheService().getStats();
+    
+    if (stats.containsKey('error')) {
+      return Text('캐시 초기화 안됨', style: TextStyle(color: Colors.grey[600]));
+    }
+    
+    final total = stats['total'] ?? 0;
+    final valid = stats['valid'] ?? 0;
+    final expired = stats['expired'] ?? 0;
+    
+    return Text(
+      '전체: $total개 | 유효: $valid개 | 만료: $expired개',
+      style: TextStyle(color: Colors.grey[600]),
+    );
+  }
+
+  String _formatBytes(int bytes) {
+    if (bytes < 1024) return '$bytes B';
+    if (bytes < 1024 * 1024) return '${(bytes / 1024).toStringAsFixed(1)} KB';
+    if (bytes < 1024 * 1024 * 1024) {
+      return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
+    }
+    return '${(bytes / (1024 * 1024 * 1024)).toStringAsFixed(1)} GB';
+  }
+
   String _getPECoreStatusText() {
     switch (embeddingService.status) {
       case ModelStatus.notLoaded:
@@ -638,5 +902,670 @@ class _SettingScreenState extends State<SettingScreen> {
       case ModelStatus.error:
         return '로드 실패 - 탭하여 자세히 보기';
     }
+  }
+}
+
+/// 캐시 목록 화면
+class CacheListScreen extends StatefulWidget {
+  const CacheListScreen({Key? key}) : super(key: key);
+
+  @override
+  State<CacheListScreen> createState() => _CacheListScreenState();
+}
+
+class _CacheListScreenState extends State<CacheListScreen> {
+  List<CacheItemInfo> _cacheItems = [];
+  String _filterType = '전체';
+
+  @override
+  void initState() {
+    super.initState();
+    _loadCacheItems();
+  }
+
+  void _loadCacheItems() {
+    setState(() {
+      _cacheItems = ApiCacheService().getAllCacheItems();
+    });
+  }
+
+  List<CacheItemInfo> get _filteredItems {
+    if (_filterType == '전체') return _cacheItems;
+    return _cacheItems.where((item) => item.keyType == _filterType).toList();
+  }
+
+  String _formatDuration(Duration duration) {
+    if (duration.inHours > 0) {
+      return '${duration.inHours}시간 ${duration.inMinutes.remainder(60)}분';
+    } else if (duration.inMinutes > 0) {
+      return '${duration.inMinutes}분';
+    } else {
+      return '${duration.inSeconds}초';
+    }
+  }
+
+  String _formatBytes(int bytes) {
+    if (bytes < 1024) return '$bytes B';
+    if (bytes < 1024 * 1024) return '${(bytes / 1024).toStringAsFixed(1)} KB';
+    return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final filterTypes = ['전체', '갤러리 상세', '포스트 목록', '검색 결과', '자동완성'];
+    
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('캐시 목록'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh),
+            onPressed: _loadCacheItems,
+            tooltip: '새로고침',
+          ),
+        ],
+      ),
+      body: Column(
+        children: [
+          // 필터 칩
+          Container(
+            padding: const EdgeInsets.all(8.0),
+            child: Wrap(
+              spacing: 8.0,
+              children: filterTypes.map((type) {
+                final isSelected = _filterType == type;
+                return FilterChip(
+                  label: Text(type),
+                  selected: isSelected,
+                  onSelected: (selected) {
+                    setState(() {
+                      _filterType = type;
+                    });
+                  },
+                );
+              }).toList(),
+            ),
+          ),
+          
+          // 통계 요약
+          Container(
+            padding: const EdgeInsets.all(16.0),
+            color: Theme.of(context).colorScheme.surfaceVariant.withOpacity(0.3),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceAround,
+              children: [
+                _buildStatItem('전체', _cacheItems.length.toString()),
+                _buildStatItem('유효', _cacheItems.where((item) => !item.isExpired).length.toString(), Colors.green),
+                _buildStatItem('만료', _cacheItems.where((item) => item.isExpired).length.toString(), Colors.red),
+              ],
+            ),
+          ),
+          
+          const Divider(height: 1),
+          
+          // 캐시 목록
+          Expanded(
+            child: _filteredItems.isEmpty
+                ? Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.inbox,
+                          size: 64,
+                          color: Colors.grey[400],
+                        ),
+                        const SizedBox(height: 16),
+                        Text(
+                          '캐시가 없습니다',
+                          style: TextStyle(
+                            fontSize: 16,
+                            color: Colors.grey[600],
+                          ),
+                        ),
+                      ],
+                    ),
+                  )
+                : ListView.builder(
+                    itemCount: _filteredItems.length,
+                    itemBuilder: (context, index) {
+                      final item = _filteredItems[index];
+                      return _buildCacheItemCard(item);
+                    },
+                  ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStatItem(String label, String value, [Color? color]) {
+    return Column(
+      children: [
+        Text(
+          value,
+          style: TextStyle(
+            fontSize: 24,
+            fontWeight: FontWeight.bold,
+            color: color,
+          ),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: 12,
+            color: Colors.grey[600],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildCacheItemCard(CacheItemInfo item) {
+    final isExpired = item.isExpired;
+    
+    return Card(
+      margin: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
+      child: ExpansionTile(
+        leading: Icon(
+          isExpired ? Icons.warning : Icons.check_circle,
+          color: isExpired ? Colors.red : Colors.green,
+        ),
+        title: Text(
+          item.keyType,
+          style: const TextStyle(fontWeight: FontWeight.bold),
+        ),
+        subtitle: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const SizedBox(height: 4),
+            Text(
+              item.keyValue,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(fontSize: 12, color: Colors.grey[700]),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              isExpired ? '만료됨' : '남은 시간: ${_formatDuration(item.remainingTime)}',
+              style: TextStyle(
+                fontSize: 11,
+                color: isExpired ? Colors.red : Colors.green,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ],
+        ),
+        trailing: IconButton(
+          icon: const Icon(Icons.delete, size: 20),
+          onPressed: () async {
+            final confirm = await showDialog<bool>(
+              context: context,
+              builder: (context) => AlertDialog(
+                title: const Text('캐시 삭제'),
+                content: Text('이 캐시 항목을 삭제하시겠습니까?\n\n${item.keyValue}'),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(context, false),
+                    child: const Text('취소'),
+                  ),
+                  TextButton(
+                    onPressed: () => Navigator.pop(context, true),
+                    child: const Text('삭제', style: TextStyle(color: Colors.red)),
+                  ),
+                ],
+              ),
+            );
+
+            if (confirm == true) {
+              await ApiCacheService().delete(item.key);
+              _loadCacheItems();
+              if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('캐시가 삭제되었습니다')),
+                );
+              }
+            }
+          },
+        ),
+        children: [
+          Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _buildDetailRow('키', item.key),
+                const SizedBox(height: 8),
+                _buildDetailRow('캐시된 시간', _formatDateTime(item.cachedAt)),
+                const SizedBox(height: 8),
+                _buildDetailRow('TTL', _formatDuration(item.ttl)),
+                const SizedBox(height: 8),
+                _buildDetailRow('데이터 크기', _formatBytes(item.dataSize)),
+                const SizedBox(height: 8),
+                _buildDetailRow(
+                  '상태',
+                  isExpired ? '만료됨' : '유효',
+                  valueColor: isExpired ? Colors.red : Colors.green,
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDetailRow(String label, String value, {Color? valueColor}) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SizedBox(
+          width: 100,
+          child: Text(
+            label,
+            style: TextStyle(
+              fontWeight: FontWeight.bold,
+              color: Colors.grey[700],
+            ),
+          ),
+        ),
+        Expanded(
+          child: Text(
+            value,
+            style: TextStyle(color: valueColor),
+          ),
+        ),
+      ],
+    );
+  }
+
+  String _formatDateTime(DateTime dateTime) {
+    final now = DateTime.now();
+    final diff = now.difference(dateTime);
+
+    if (diff.inDays > 0) {
+      return '${diff.inDays}일 전';
+    } else if (diff.inHours > 0) {
+      return '${diff.inHours}시간 전';
+    } else if (diff.inMinutes > 0) {
+      return '${diff.inMinutes}분 전';
+    } else {
+      return '방금 전';
+    }
+  }
+}
+
+/// 이미지 캐시 항목 정보
+class ImageCacheItemInfo {
+  final String fileName;
+  final String filePath;
+  final int fileSize;
+  final DateTime modifiedTime;
+
+  ImageCacheItemInfo({
+    required this.fileName,
+    required this.filePath,
+    required this.fileSize,
+    required this.modifiedTime,
+  });
+}
+
+/// 이미지 캐시 목록 화면
+class ImageCacheListScreen extends StatefulWidget {
+  const ImageCacheListScreen({Key? key}) : super(key: key);
+
+  @override
+  State<ImageCacheListScreen> createState() => _ImageCacheListScreenState();
+}
+
+class _ImageCacheListScreenState extends State<ImageCacheListScreen> {
+  List<ImageCacheItemInfo> _cacheItems = [];
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadCacheItems();
+  }
+
+  Future<void> _loadCacheItems() async {
+    setState(() {
+      _isLoading = true;
+    });
+
+    try {
+      final tempDir = await getTemporaryDirectory();
+      final cacheDir = Directory('${tempDir.path}/libCachedImageData');
+      
+      final items = <ImageCacheItemInfo>[];
+      
+      if (await cacheDir.exists()) {
+        final files = cacheDir.listSync(recursive: true);
+        
+        for (final file in files) {
+          if (file is File) {
+            final stat = await file.stat();
+            items.add(ImageCacheItemInfo(
+              fileName: file.path.split(Platform.pathSeparator).last,
+              filePath: file.path,
+              fileSize: await file.length(),
+              modifiedTime: stat.modified,
+            ));
+          }
+        }
+      }
+      
+      // 최신순으로 정렬
+      items.sort((a, b) => b.modifiedTime.compareTo(a.modifiedTime));
+      
+      if (mounted) {
+        setState(() {
+          _cacheItems = items;
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      debugPrint('이미지 캐시 목록 로드 실패: $e');
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
+  }
+
+  String _formatBytes(int bytes) {
+    if (bytes < 1024) return '$bytes B';
+    if (bytes < 1024 * 1024) return '${(bytes / 1024).toStringAsFixed(1)} KB';
+    if (bytes < 1024 * 1024 * 1024) {
+      return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
+    }
+    return '${(bytes / (1024 * 1024 * 1024)).toStringAsFixed(1)} GB';
+  }
+
+  String _formatDateTime(DateTime dateTime) {
+    final now = DateTime.now();
+    final diff = now.difference(dateTime);
+
+    if (diff.inDays > 0) {
+      return '${diff.inDays}일 전';
+    } else if (diff.inHours > 0) {
+      return '${diff.inHours}시간 전';
+    } else if (diff.inMinutes > 0) {
+      return '${diff.inMinutes}분 전';
+    } else {
+      return '방금 전';
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('이미지 캐시 목록'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh),
+            onPressed: _loadCacheItems,
+            tooltip: '새로고침',
+          ),
+        ],
+      ),
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : Column(
+              children: [
+                // 통계 요약
+                Container(
+                  padding: const EdgeInsets.all(16.0),
+                  color: Theme.of(context).colorScheme.surfaceVariant.withOpacity(0.3),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceAround,
+                    children: [
+                      _buildStatItem('전체', _cacheItems.length.toString()),
+                      _buildStatItem(
+                        '총 크기',
+                        _formatBytes(_cacheItems.fold<int>(
+                          0,
+                          (sum, item) => sum + item.fileSize,
+                        )),
+                        Colors.blue,
+                      ),
+                    ],
+                  ),
+                ),
+                
+                const Divider(height: 1),
+                
+                // 캐시 목록
+                Expanded(
+                  child: _cacheItems.isEmpty
+                      ? Center(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                Icons.image_not_supported,
+                                size: 64,
+                                color: Colors.grey[400],
+                              ),
+                              const SizedBox(height: 16),
+                              Text(
+                                '캐시된 이미지가 없습니다',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  color: Colors.grey[600],
+                                ),
+                              ),
+                            ],
+                          ),
+                        )
+                      : ListView.builder(
+                          itemCount: _cacheItems.length,
+                          itemBuilder: (context, index) {
+                            final item = _cacheItems[index];
+                            return _buildCacheItemCard(item);
+                          },
+                        ),
+                ),
+              ],
+            ),
+    );
+  }
+
+  Widget _buildStatItem(String label, String value, [Color? color]) {
+    return Column(
+      children: [
+        Text(
+          value,
+          style: TextStyle(
+            fontSize: 24,
+            fontWeight: FontWeight.bold,
+            color: color,
+          ),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: 12,
+            color: Colors.grey[600],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildCacheItemCard(ImageCacheItemInfo item) {
+    return Card(
+      margin: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
+      child: ListTile(
+        leading: CircleAvatar(
+          backgroundColor: Colors.blue.withOpacity(0.2),
+          child: const Icon(Icons.image, color: Colors.blue),
+        ),
+        title: Text(
+          item.fileName,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+        ),
+        subtitle: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const SizedBox(height: 4),
+            Text(
+              '크기: ${_formatBytes(item.fileSize)}',
+              style: TextStyle(fontSize: 12, color: Colors.grey[700]),
+            ),
+            Text(
+              '수정: ${_formatDateTime(item.modifiedTime)}',
+              style: TextStyle(fontSize: 11, color: Colors.grey[600]),
+            ),
+          ],
+        ),
+        trailing: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            IconButton(
+              icon: const Icon(Icons.visibility, size: 20),
+              tooltip: '미리보기',
+              onPressed: () {
+                showDialog(
+                  context: context,
+                  builder: (context) => Dialog(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        AppBar(
+                          title: const Text('이미지 미리보기'),
+                          leading: IconButton(
+                            icon: const Icon(Icons.close),
+                            onPressed: () => Navigator.pop(context),
+                          ),
+                        ),
+                        Flexible(
+                          child: InteractiveViewer(
+                            child: Image.file(
+                              File(item.filePath),
+                              errorBuilder: (context, error, stackTrace) {
+                                return Container(
+                                  padding: const EdgeInsets.all(32),
+                                  child: Column(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(Icons.error, size: 48, color: Colors.red[300]),
+                                      const SizedBox(height: 16),
+                                      const Text('이미지를 불러올 수 없습니다'),
+                                    ],
+                                  ),
+                                );
+                              },
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              },
+            ),
+            IconButton(
+              icon: const Icon(Icons.delete, size: 20),
+              tooltip: '삭제',
+              onPressed: () async {
+                final confirm = await showDialog<bool>(
+                  context: context,
+                  builder: (context) => AlertDialog(
+                    title: const Text('이미지 캐시 삭제'),
+                    content: Text('이 이미지를 삭제하시겠습니까?\n\n${item.fileName}'),
+                    actions: [
+                      TextButton(
+                        onPressed: () => Navigator.pop(context, false),
+                        child: const Text('취소'),
+                      ),
+                      TextButton(
+                        onPressed: () => Navigator.pop(context, true),
+                        child: const Text('삭제', style: TextStyle(color: Colors.red)),
+                      ),
+                    ],
+                  ),
+                );
+
+                if (confirm == true) {
+                  try {
+                    await File(item.filePath).delete();
+                    await _loadCacheItems();
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('이미지가 삭제되었습니다')),
+                      );
+                    }
+                  } catch (e) {
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text('삭제 실패: $e')),
+                      );
+                    }
+                  }
+                }
+              },
+            ),
+          ],
+        ),
+        onTap: () {
+          showDialog(
+            context: context,
+            builder: (context) => AlertDialog(
+              title: const Text('이미지 정보'),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _buildDetailRow('파일명', item.fileName),
+                  const SizedBox(height: 8),
+                  _buildDetailRow('크기', _formatBytes(item.fileSize)),
+                  const SizedBox(height: 8),
+                  _buildDetailRow('수정 시간', item.modifiedTime.toString().split('.')[0]),
+                  const SizedBox(height: 8),
+                  _buildDetailRow('경로', item.filePath),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('확인'),
+                ),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildDetailRow(String label, String value) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SizedBox(
+          width: 80,
+          child: Text(
+            label,
+            style: const TextStyle(
+              fontWeight: FontWeight.bold,
+              color: Colors.grey,
+            ),
+          ),
+        ),
+        Expanded(
+          child: Text(
+            value,
+            style: const TextStyle(fontSize: 12),
+          ),
+        ),
+      ],
+    );
   }
 }

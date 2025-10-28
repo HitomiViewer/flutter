@@ -2,6 +2,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:hitomiviewer/app_router.dart';
+import 'package:hitomiviewer/services/api_cache.dart';
 import 'package:hitomiviewer/services/image_embedding.dart';
 import 'package:hitomiviewer/store.dart';
 import 'package:provider/provider.dart';
@@ -18,6 +19,22 @@ class AppScrollBehavior extends MaterialScrollBehavior {
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // API 캐시 초기화 (가장 먼저)
+  try {
+    debugPrint('🚀 API 캐시 초기화 중...');
+    await ApiCacheService().initialize();
+    
+    // 만료된 캐시 정리
+    await ApiCacheService().cleanExpired();
+    
+    debugPrint('✅ API 캐시 초기화 완료');
+  } catch (e, stackTrace) {
+    debugPrint('❌ API 캐시 초기화 실패:');
+    debugPrint('  - 에러: $e');
+    debugPrint('  - 스택 트레이스: $stackTrace');
+    debugPrint('  - 앱은 계속 실행되지만 캐시 기능은 사용할 수 없습니다.');
+  }
 
   // ONNX Runtime 환경 초기화
   try {

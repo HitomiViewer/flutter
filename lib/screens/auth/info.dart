@@ -1,4 +1,5 @@
 import 'package:auto_route/auto_route.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:hitomiviewer/services/auth.dart';
@@ -27,49 +28,61 @@ class _InfoScreenState extends State<InfoScreen> {
     super.initState();
   }
 
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
+  void _loadUserInfo() async {
     final store = context.read<Store>();
 
-    (() async {
+    try {
+      String accessToken = await refresh(store.refreshToken);
+      store.setAccessToken(accessToken);
+      
       try {
-        String accessToken = await refresh(store.refreshToken);
-        store.setAccessToken(accessToken);
-        
-        try {
-          final value = await getUserInfo(accessToken);
+        final value = await getUserInfo(accessToken);
+        if (mounted) {
           setState(() {
             _id = value.id;
             _name = value.name;
             _email = value.email;
             _avatar = value.avatar;
           });
-        } catch (e, stackTrace) {
-          debugPrint('❌ getUserInfo 에러:');
-          debugPrint('  - 에러: $e');
-          debugPrint('  - 스택 트레이스: $stackTrace');
-          
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-              content: Text('사용자 정보 조회 실패: $e'),
-              duration: const Duration(seconds: 5),
-            ));
-          }
         }
       } catch (e, stackTrace) {
-        debugPrint('❌ refresh 에러:');
+        debugPrint('❌ getUserInfo 에러:');
         debugPrint('  - 에러: $e');
         debugPrint('  - 스택 트레이스: $stackTrace');
         
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-            content: Text('토큰 갱신 실패: $e'),
+            content: Text('사용자 정보 조회 실패: $e'),
             duration: const Duration(seconds: 5),
+            action: SnackBarAction(
+              label: '재시도',
+              onPressed: _loadUserInfo,
+            ),
           ));
         }
       }
-    })();
+    } catch (e, stackTrace) {
+      debugPrint('❌ refresh 에러:');
+      debugPrint('  - 에러: $e');
+      debugPrint('  - 스택 트레이스: $stackTrace');
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('토큰 갱신 실패: $e'),
+          duration: const Duration(seconds: 5),
+          action: SnackBarAction(
+            label: '재시도',
+            onPressed: _loadUserInfo,
+          ),
+        ));
+      }
+    }
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _loadUserInfo();
   }
 
   @override
@@ -88,10 +101,16 @@ class _InfoScreenState extends State<InfoScreen> {
             Text("Name: $_name"),
             Text("Email: $_email"),
             _avatar != null
-                ? Image.network(
-                    _avatar!,
+                ? CachedNetworkImage(
+                    imageUrl: _avatar!,
                     width: 100,
                     height: 100,
+                    placeholder: (context, url) => const SizedBox(
+                      width: 100,
+                      height: 100,
+                      child: Center(child: CircularProgressIndicator()),
+                    ),
+                    errorWidget: (context, url, error) => const Icon(Icons.error),
                   )
                 : const Text("Avatar: null"),
           ],

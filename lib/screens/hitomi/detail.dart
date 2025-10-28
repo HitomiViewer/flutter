@@ -188,6 +188,10 @@ class _HitomiDetailScreenState extends State<HitomiDetailScreen> {
         SnackBar(
           content: Text('오류 발생: $e'),
           duration: const Duration(seconds: 5),
+          action: SnackBarAction(
+            label: '재시도',
+            onPressed: () => _findSimilarImages(context),
+          ),
         ),
       );
     }

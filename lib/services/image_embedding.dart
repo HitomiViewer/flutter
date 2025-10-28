@@ -4,6 +4,7 @@ import 'dart:math';
 import 'dart:typed_data';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_cache_manager/flutter_cache_manager.dart';
 import 'package:image/image.dart' as img;
 import 'package:onnxruntime/onnxruntime.dart';
 import 'package:http/http.dart' as http;
@@ -276,15 +277,24 @@ class ImageEmbeddingService extends ChangeNotifier {
 
   /// 이미지를 임베딩 벡터로 변환
   /// URL에서 이미지를 다운로드하고 임베딩 생성
+  /// CachedNetworkImage와 동일한 캐시를 사용하여 중복 다운로드 방지
   Future<List<double>> getImageEmbeddingFromUrl(String imageUrl) async {
     try {
-      final response = await http.get(Uri.parse(imageUrl));
-      if (response.statusCode == 200) {
-        debugPrint('✅ 이미지 다운로드 성공: ${response.bodyBytes.length} bytes');
-        return await getImageEmbedding(response.bodyBytes);
+      final cacheManager = DefaultCacheManager();
+      
+      // 캐시 확인
+      final cachedFile = await cacheManager.getFileFromCache(imageUrl);
+      final bool fromCache = cachedFile != null && cachedFile.validTill.isAfter(DateTime.now());
+      
+      // 캐시에서 파일 가져오기 (없으면 자동으로 다운로드하여 캐시에 저장)
+      final fileInfo = await cacheManager.downloadFile(imageUrl);
+      
+      if (fileInfo.file.existsSync()) {
+        final imageBytes = await fileInfo.file.readAsBytes();
+        debugPrint('✅ 이미지 로드 성공 (${fromCache ? "캐시" : "다운로드"}): ${imageBytes.length} bytes');
+        return await getImageEmbedding(imageBytes);
       } else {
-        debugPrint('  - 응답 본문 전체:\n${response.body}');
-        throw Exception('이미지 다운로드 실패 (Status ${response.statusCode})');
+        throw Exception('이미지 파일을 찾을 수 없습니다');
       }
     } catch (e, stackTrace) {
       debugPrint('❌ getImageEmbeddingFromUrl 에러:');
