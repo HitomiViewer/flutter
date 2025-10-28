@@ -1401,9 +1401,23 @@ class _ImageCacheListScreenState extends State<ImageCacheListScreen> {
     return Card(
       margin: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
       child: ListTile(
-        leading: CircleAvatar(
-          backgroundColor: Colors.blue.withOpacity(0.2),
-          child: const Icon(Icons.image, color: Colors.blue),
+        leading: ClipRRect(
+          borderRadius: BorderRadius.circular(8),
+          child: Container(
+            width: 56,
+            height: 56,
+            color: Colors.grey[200],
+            child: Image.file(
+              File(item.filePath),
+              fit: BoxFit.cover,
+              errorBuilder: (context, error, stackTrace) {
+                return Container(
+                  color: Colors.blue.withOpacity(0.2),
+                  child: const Icon(Icons.image, color: Colors.blue),
+                );
+              },
+            ),
+          ),
         ),
         title: Text(
           item.fileName,
