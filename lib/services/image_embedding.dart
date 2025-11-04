@@ -78,9 +78,18 @@ class ImageEmbeddingService extends ChangeNotifier {
   // 요청-응답 매칭
   final Map<String, Completer<IsolateResponse>> _pendingRequests = {};
   int _requestCounter = 0;
+  
+  // 동시 요청 제한
+  int _activeRequests = 0;
+  static const int _maxConcurrentRequests = 3;
+  final List<Completer<void>> _requestQueue = [];
+  
+  // 진행 중인 임베딩 요청 캐시 (중복 요청 방지)
+  final Map<String, Future<List<double>>> _pendingEmbeddings = {};
 
   ModelStatus _status = ModelStatus.notLoaded;
   String? _errorMessage;
+  bool _isRestarting = false;
 
   ModelStatus get status => _status;
   String? get errorMessage => _errorMessage;
@@ -183,6 +192,65 @@ class ImageEmbeddingService extends ChangeNotifier {
     }
   }
 
+  /// 동시 요청 수 제한
+  Future<void> _acquireRequestSlot() async {
+    if (_activeRequests >= _maxConcurrentRequests) {
+      final completer = Completer<void>();
+      _requestQueue.add(completer);
+      await completer.future;
+    }
+    _activeRequests++;
+  }
+
+  /// 요청 슬롯 해제
+  void _releaseRequestSlot() {
+    _activeRequests--;
+    if (_requestQueue.isNotEmpty) {
+      final completer = _requestQueue.removeAt(0);
+      completer.complete();
+    }
+  }
+
+  /// Worker Isolate 재시작
+  Future<void> _restartWorker() async {
+    if (_isRestarting) {
+      debugPrint('⚠️  이미 재시작 중입니다');
+      return;
+    }
+
+    _isRestarting = true;
+    debugPrint('🔄 Worker Isolate 재시작 중...');
+
+    try {
+      // 기존 Isolate 정리
+      _workerIsolate?.kill(priority: Isolate.immediate);
+      _mainReceivePort?.close();
+      _workerSendPort = null;
+      _pendingRequests.clear();
+      _pendingEmbeddings.clear();
+      _activeRequests = 0;
+      
+      // 대기 중인 요청들 모두 취소
+      for (final completer in _requestQueue) {
+        if (!completer.isCompleted) {
+          completer.completeError(Exception('Worker 재시작으로 인한 요청 취소'));
+        }
+      }
+      _requestQueue.clear();
+
+      // 재초기화
+      await initialize();
+      debugPrint('✅ Worker Isolate 재시작 완료');
+    } catch (e) {
+      debugPrint('❌ Worker Isolate 재시작 실패: $e');
+      _status = ModelStatus.error;
+      _errorMessage = '재시작 실패: $e';
+      notifyListeners();
+    } finally {
+      _isRestarting = false;
+    }
+  }
+
   /// Worker Isolate에 요청 전송 및 응답 대기
   Future<IsolateResponse> _sendRequest(
     IsolateRequestType type,
@@ -192,30 +260,45 @@ class ImageEmbeddingService extends ChangeNotifier {
       throw Exception('Worker Isolate가 초기화되지 않았습니다');
     }
 
-    final requestId = 'req_${_requestCounter++}';
-    final completer = Completer<IsolateResponse>();
-    _pendingRequests[requestId] = completer;
+    // 동시 요청 수 제한
+    await _acquireRequestSlot();
 
-    final request = IsolateRequest(
-      id: requestId,
-      type: type,
-      data: data,
-    );
-
-    _workerSendPort!.send(request);
-
-    // 응답 대기 (타임아웃 60초)
     try {
-      return await completer.future.timeout(
-        const Duration(seconds: 60),
-        onTimeout: () {
-          _pendingRequests.remove(requestId);
-          throw TimeoutException('Worker Isolate 응답 타임아웃');
-        },
+      final requestId = 'req_${_requestCounter++}';
+      final completer = Completer<IsolateResponse>();
+      _pendingRequests[requestId] = completer;
+
+      final request = IsolateRequest(
+        id: requestId,
+        type: type,
+        data: data,
       );
-    } catch (e) {
-      _pendingRequests.remove(requestId);
-      rethrow;
+
+      _workerSendPort!.send(request);
+
+      // 응답 대기 (타임아웃 30초로 단축)
+      try {
+        return await completer.future.timeout(
+          const Duration(seconds: 30),
+          onTimeout: () {
+            _pendingRequests.remove(requestId);
+            throw TimeoutException('Worker Isolate 응답 타임아웃 (30초)');
+          },
+        );
+      } catch (e) {
+        _pendingRequests.remove(requestId);
+        
+        // 타임아웃 발생 시 Worker 재시작 (초기화가 아닌 경우만)
+        if (e is TimeoutException && type != IsolateRequestType.initialize) {
+          debugPrint('⚠️  타임아웃으로 인한 Worker 재시작 예약');
+          // 비동기로 재시작 (현재 요청을 블록하지 않음)
+          Future.delayed(Duration.zero, _restartWorker);
+        }
+        
+        rethrow;
+      }
+    } finally {
+      _releaseRequestSlot();
     }
   }
 
@@ -278,7 +361,29 @@ class ImageEmbeddingService extends ChangeNotifier {
   /// 이미지를 임베딩 벡터로 변환
   /// URL에서 이미지를 다운로드하고 임베딩 생성
   /// CachedNetworkImage와 동일한 캐시를 사용하여 중복 다운로드 방지
+  /// 중복 요청 방지: 동일 URL에 대한 동시 요청은 하나만 처리
   Future<List<double>> getImageEmbeddingFromUrl(String imageUrl) async {
+    // 이미 진행 중인 요청이 있으면 그 결과를 반환
+    if (_pendingEmbeddings.containsKey(imageUrl)) {
+      debugPrint('⏳ 진행 중인 임베딩 요청 대기: $imageUrl');
+      return await _pendingEmbeddings[imageUrl]!;
+    }
+
+    // 새로운 요청 생성
+    final future = _getImageEmbeddingFromUrlInternal(imageUrl);
+    _pendingEmbeddings[imageUrl] = future;
+
+    try {
+      final result = await future;
+      return result;
+    } finally {
+      // 완료 후 캐시에서 제거
+      _pendingEmbeddings.remove(imageUrl);
+    }
+  }
+
+  /// 내부 구현 (중복 방지 로직 없음)
+  Future<List<double>> _getImageEmbeddingFromUrlInternal(String imageUrl) async {
     try {
       final cacheManager = DefaultCacheManager();
       
@@ -641,6 +746,9 @@ class ImageEmbeddingService extends ChangeNotifier {
     _mainReceivePort = null;
     _workerSendPort = null;
     _pendingRequests.clear();
+    _pendingEmbeddings.clear();
+    _requestQueue.clear();
+    _activeRequests = 0;
 
     super.dispose();
   }

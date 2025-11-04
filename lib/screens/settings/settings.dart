@@ -441,6 +441,17 @@ class _SettingScreenState extends State<SettingScreen> {
           SettingsSection(
             title: const Text('이미지 분석'),
             tiles: [
+              // 자동 로딩 설정
+              SettingsTile.switchTile(
+                leading: const Icon(Icons.power_settings_new),
+                title: const Text('앱 시작 시 모델 자동 로드'),
+                description: const Text('활성화하면 앱 시작 시 PE-Core 모델을 자동으로 로드합니다'),
+                initialValue: store.autoLoadModel,
+                onToggle: (value) {
+                  store.setAutoLoadModel(value);
+                },
+              ),
+
               // 모델 정보
               SettingsTile(
                 leading: Icon(
@@ -636,12 +647,21 @@ class _SettingScreenState extends State<SettingScreen> {
                   },
                 ),
 
-              // 모델 초기화 버튼 (에러 시)
-              if (embeddingService.status == ModelStatus.error)
+              // 수동 로드 버튼 (notLoaded 또는 에러 시)
+              if (embeddingService.status == ModelStatus.error || 
+                  embeddingService.status == ModelStatus.notLoaded)
                 SettingsTile(
                   leading: const Icon(Icons.refresh),
-                  title: const Text('모델 다시 로드'),
-                  description: const Text('모델 초기화를 다시 시도합니다'),
+                  title: Text(
+                    embeddingService.status == ModelStatus.notLoaded
+                        ? '모델 로드'
+                        : '모델 다시 로드'
+                  ),
+                  description: Text(
+                    embeddingService.status == ModelStatus.notLoaded
+                        ? '탭하여 PE-Core 모델을 로드합니다'
+                        : '모델 초기화를 다시 시도합니다'
+                  ),
                   onPressed: (context) async {
                     final messenger = ScaffoldMessenger.of(context);
                     try {

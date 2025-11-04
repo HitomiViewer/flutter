@@ -23,6 +23,7 @@ class Store extends ChangeNotifier {
       favorite.sort((a, b) => b.compareTo(a));
 
       refreshToken = prefs.getString('refreshToken') ?? refreshToken;
+      autoLoadModel = prefs.getBool('autoLoadModel') ?? autoLoadModel;
 
       // 이미지 분석 결과 로드
       _loadImageAnalysis();
@@ -58,6 +59,13 @@ class Store extends ChangeNotifier {
   setLanguage(String language) {
     this.language = language;
     _prefs?.setString('language', language);
+    notifyListeners();
+  }
+
+  var autoLoadModel = false;
+  setAutoLoadModel(bool autoLoadModel) {
+    this.autoLoadModel = autoLoadModel;
+    _prefs?.setBool('autoLoadModel', autoLoadModel);
     notifyListeners();
   }
 
