@@ -79,6 +79,26 @@ class _PreviewState extends State<Preview> {
                         child: CachedNetworkImage(
                           imageUrl:
                               'https://$API_HOST/api/hitomi/images/preview/${snapshot.data!['files'][0]['hash']}.webp',
+                          errorWidget: (context, url, error) => Container(
+                            color: Theme.of(context).colorScheme.surface,
+                            child: Center(
+                              child: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(
+                                    Icons.broken_image,
+                                    color: Colors.grey,
+                                    size: 64,
+                                  ),
+                                  const SizedBox(height: 8),
+                                  Text(
+                                    '이미지를 불러올 수 없습니다',
+                                    style: TextStyle(color: Colors.grey),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
                         ),
                       ),
                     ),
@@ -102,6 +122,19 @@ class _PreviewState extends State<Preview> {
                                 image: imageProvider,
                                 fit: BoxFit.contain,
                               ),
+                            ),
+                          ),
+                          errorWidget: (context, url, error) => Container(
+                            width: 100,
+                            height: 100,
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(5),
+                              color: imageBackgroundColor,
+                            ),
+                            child: Icon(
+                              Icons.broken_image,
+                              color: Colors.grey,
+                              size: 40,
                             ),
                           ),
                         ),

@@ -306,44 +306,64 @@ class ImageEmbeddingService extends ChangeNotifier {
   /// 이미지 전처리 (PE-Core: 336x336, ImageNet 정규화)
   /// 백그라운드에서 실행 가능한 독립 함수
   static Float32List _preprocessImage(Uint8List imageBytes) {
-    // 이미지 디코딩
-    final image = img.decodeImage(imageBytes);
-    if (image == null) {
-      debugPrint('❌ 이미지 디코딩 실패: ${imageBytes.length} bytes');
-      throw Exception('이미지 디코딩 실패 (크기: ${imageBytes.length} bytes)');
-    }
-    
-    debugPrint('✅ 이미지 디코딩 성공: ${image.width}x${image.height}');
-
-    // 336x336로 리사이즈 (center crop)
-    final resized = img.copyResize(image, width: imageSize, height: imageSize);
-
-    // ImageNet 정규화
-    // mean = [0.485, 0.456, 0.406]
-    // std = [0.229, 0.224, 0.225]
-    const mean = [0.485, 0.456, 0.406];
-    const std = [0.229, 0.224, 0.225];
-
-    // NCHW 포맷으로 변환 [1, 3, 336, 336]
-    final input = Float32List(1 * 3 * imageSize * imageSize);
-
-    for (var y = 0; y < imageSize; y++) {
-      for (var x = 0; x < imageSize; x++) {
-        final pixel = resized.getPixel(x, y);
-        final idx = y * imageSize + x;
-
-        // R 채널
-        input[idx] = ((pixel.r / 255.0) - mean[0]) / std[0];
-        // G 채널
-        input[imageSize * imageSize + idx] =
-            ((pixel.g / 255.0) - mean[1]) / std[1];
-        // B 채널
-        input[2 * imageSize * imageSize + idx] =
-            ((pixel.b / 255.0) - mean[2]) / std[2];
+    try {
+      // 이미지 데이터 기본 검증
+      if (imageBytes.isEmpty) {
+        throw Exception('빈 이미지 데이터');
       }
-    }
+      
+      if (imageBytes.length < 100) {
+        throw Exception('이미지 데이터가 너무 작음: ${imageBytes.length} bytes');
+      }
+      
+      // 이미지 디코딩
+      final image = img.decodeImage(imageBytes);
+      if (image == null) {
+        debugPrint('❌ 이미지 디코딩 실패: ${imageBytes.length} bytes');
+        debugPrint('  - 첫 16 bytes: ${imageBytes.take(16).toList()}');
+        throw Exception('이미지 디코딩 실패 (손상된 이미지 데이터, 크기: ${imageBytes.length} bytes)');
+      }
+      
+      // 이미지 크기 검증
+      if (image.width <= 0 || image.height <= 0) {
+        throw Exception('유효하지 않은 이미지 크기: ${image.width}x${image.height}');
+      }
+      
+      debugPrint('✅ 이미지 디코딩 성공: ${image.width}x${image.height}');
 
-    return input;
+      // 336x336로 리사이즈 (center crop)
+      final resized = img.copyResize(image, width: imageSize, height: imageSize);
+
+      // ImageNet 정규화
+      // mean = [0.485, 0.456, 0.406]
+      // std = [0.229, 0.224, 0.225]
+      const mean = [0.485, 0.456, 0.406];
+      const std = [0.229, 0.224, 0.225];
+
+      // NCHW 포맷으로 변환 [1, 3, 336, 336]
+      final input = Float32List(1 * 3 * imageSize * imageSize);
+
+      for (var y = 0; y < imageSize; y++) {
+        for (var x = 0; x < imageSize; x++) {
+          final pixel = resized.getPixel(x, y);
+          final idx = y * imageSize + x;
+
+          // R 채널
+          input[idx] = ((pixel.r / 255.0) - mean[0]) / std[0];
+          // G 채널
+          input[imageSize * imageSize + idx] =
+              ((pixel.g / 255.0) - mean[1]) / std[1];
+          // B 채널
+          input[2 * imageSize * imageSize + idx] =
+              ((pixel.b / 255.0) - mean[2]) / std[2];
+        }
+      }
+
+      return input;
+    } catch (e) {
+      debugPrint('❌ 이미지 전처리 실패: $e');
+      throw Exception('이미지 전처리 실패: $e');
+    }
   }
 
   /// 임베딩 정규화 (L2 normalization)
@@ -384,9 +404,9 @@ class ImageEmbeddingService extends ChangeNotifier {
 
   /// 내부 구현 (중복 방지 로직 없음)
   Future<List<double>> _getImageEmbeddingFromUrlInternal(String imageUrl) async {
+    final cacheManager = DefaultCacheManager();
+    
     try {
-      final cacheManager = DefaultCacheManager();
-      
       // 캐시 확인
       final cachedFile = await cacheManager.getFileFromCache(imageUrl);
       final bool fromCache = cachedFile != null && cachedFile.validTill.isAfter(DateTime.now());
@@ -394,18 +414,51 @@ class ImageEmbeddingService extends ChangeNotifier {
       // 캐시에서 파일 가져오기 (없으면 자동으로 다운로드하여 캐시에 저장)
       final fileInfo = await cacheManager.downloadFile(imageUrl);
       
-      if (fileInfo.file.existsSync()) {
-        final imageBytes = await fileInfo.file.readAsBytes();
-        debugPrint('✅ 이미지 로드 성공 (${fromCache ? "캐시" : "다운로드"}): ${imageBytes.length} bytes');
-        return await getImageEmbedding(imageBytes);
-      } else {
+      if (!fileInfo.file.existsSync()) {
         throw Exception('이미지 파일을 찾을 수 없습니다');
+      }
+      
+      final imageBytes = await fileInfo.file.readAsBytes();
+      
+      // 이미지 데이터 유효성 검증
+      if (imageBytes.isEmpty) {
+        debugPrint('❌ 빈 이미지 데이터 감지, 캐시 제거: $imageUrl');
+        await cacheManager.removeFile(imageUrl);
+        throw Exception('빈 이미지 데이터');
+      }
+      
+      // 최소 크기 검증 (100 bytes 이하는 손상된 것으로 간주)
+      if (imageBytes.length < 100) {
+        debugPrint('❌ 이미지 데이터가 너무 작음 (${imageBytes.length} bytes), 캐시 제거');
+        await cacheManager.removeFile(imageUrl);
+        throw Exception('이미지 데이터가 너무 작음: ${imageBytes.length} bytes');
+      }
+      
+      debugPrint('✅ 이미지 로드 성공 (${fromCache ? "캐시" : "다운로드"}): ${imageBytes.length} bytes');
+      
+      try {
+        // 임베딩 생성 시도
+        return await getImageEmbedding(imageBytes);
+      } catch (e) {
+        // 임베딩 생성 실패 시 (디코딩 에러 등) 캐시 제거
+        if (e.toString().contains('디코딩 실패') || 
+            e.toString().contains('Invalid image') ||
+            e.toString().contains('이미지 전처리 실패')) {
+          debugPrint('❌ 손상된 이미지 데이터 감지, 캐시 제거: $imageUrl');
+          await cacheManager.removeFile(imageUrl);
+        }
+        rethrow;
       }
     } catch (e, stackTrace) {
       debugPrint('❌ getImageEmbeddingFromUrl 에러:');
       debugPrint('  - URL: $imageUrl');
       debugPrint('  - 에러: $e');
-      debugPrint('  - 스택 트레이스: $stackTrace');
+      
+      // 스택 트레이스는 디버그 모드에서만 출력
+      if (kDebugMode) {
+        debugPrint('  - 스택 트레이스: $stackTrace');
+      }
+      
       rethrow;
     }
   }

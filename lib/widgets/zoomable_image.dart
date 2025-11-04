@@ -85,6 +85,35 @@ class ZoomableImageState extends State<ZoomableImage> {
               fit: BoxFit.contain,
             );
           },
+          errorWidget: (context, url, error) => Center(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  Icons.broken_image,
+                  color: Colors.grey,
+                  size: 64,
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  '이미지를 불러올 수 없습니다',
+                  style: TextStyle(
+                    color: Colors.grey,
+                    fontSize: 16,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  '네트워크 연결을 확인하거나\n나중에 다시 시도해주세요',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: Colors.grey[400],
+                    fontSize: 14,
+                  ),
+                ),
+              ],
+            ),
+          ),
         ),
       ),
     );

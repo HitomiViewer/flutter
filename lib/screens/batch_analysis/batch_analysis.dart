@@ -484,16 +484,24 @@ class _BatchAnalysisScreenState extends State<BatchAnalysisScreen> {
         // 이미지 다운로드
         final response = await http.get(Uri.parse(imageUrl));
         if (response.statusCode != 200) {
-          debugPrint('  - 응답 본문 전체:\n${response.body}');
-          throw Exception('이미지 다운로드 실패 (Status ${response.statusCode})');
+          debugPrint('  - HTTP 에러: ${response.statusCode}');
+          throw Exception('이미지 다운로드 실패 (HTTP ${response.statusCode})');
         }
 
-        debugPrint('  - 이미지 다운로드 성공: ${response.bodyBytes.length} bytes');
+        final imageBytes = response.bodyBytes;
+        debugPrint('  - 이미지 다운로드 성공: ${imageBytes.length} bytes');
+
+        // 이미지 데이터 유효성 검증
+        if (imageBytes.isEmpty) {
+          throw Exception('빈 이미지 데이터');
+        }
+        
+        if (imageBytes.length < 100) {
+          throw Exception('이미지 데이터가 너무 작음 (${imageBytes.length} bytes)');
+        }
 
         // 임베딩 생성
-        final embedding = await embeddingService.getImageEmbedding(
-          response.bodyBytes,
-        );
+        final embedding = await embeddingService.getImageEmbedding(imageBytes);
 
         // 임베딩 저장
         await store.saveGalleryEmbedding(
@@ -649,16 +657,24 @@ class _BatchAnalysisScreenState extends State<BatchAnalysisScreen> {
         // 이미지 다운로드
         final response = await http.get(Uri.parse(imageUrl));
         if (response.statusCode != 200) {
-          debugPrint('  - 응답 본문 전체:\n${response.body}');
-          throw Exception('이미지 다운로드 실패 (Status ${response.statusCode})');
+          debugPrint('  - HTTP 에러: ${response.statusCode}');
+          throw Exception('이미지 다운로드 실패 (HTTP ${response.statusCode})');
         }
 
-        debugPrint('  - 이미지 다운로드 성공: ${response.bodyBytes.length} bytes');
+        final imageBytes = response.bodyBytes;
+        debugPrint('  - 이미지 다운로드 성공: ${imageBytes.length} bytes');
+
+        // 이미지 데이터 유효성 검증
+        if (imageBytes.isEmpty) {
+          throw Exception('빈 이미지 데이터');
+        }
+        
+        if (imageBytes.length < 100) {
+          throw Exception('이미지 데이터가 너무 작음 (${imageBytes.length} bytes)');
+        }
 
         // 임베딩 생성
-        final embedding = await embeddingService.getImageEmbedding(
-          response.bodyBytes,
-        );
+        final embedding = await embeddingService.getImageEmbedding(imageBytes);
 
         // 임베딩 저장
         await store.saveGalleryEmbedding(
