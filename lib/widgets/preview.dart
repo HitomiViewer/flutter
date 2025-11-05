@@ -286,11 +286,7 @@ class _PreviewState extends State<Preview> {
   }
 
   Widget _buildScoreBadge(double score) {
-    // 30점 미만은 표시하지 않음 (이제 점수가 더 낮아졌으므로)
-    if (score < 30) {
-      return const SizedBox.shrink();
-    }
-
+    // 모든 점수를 표시 (색상으로 구분)
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
       decoration: BoxDecoration(
@@ -324,7 +320,7 @@ class _PreviewState extends State<Preview> {
     } else if (score >= 30) {
       return Colors.grey; // 30-49 : 약한 추천
     } else {
-      return Colors.transparent; // 표시 안 함
+      return Colors.blueGrey; // 30 미만 : 매우 약한 추천
     }
   }
 }

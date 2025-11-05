@@ -1,8 +1,10 @@
+import 'dart:convert';
 import 'dart:math';
 
 import 'package:auto_route/auto_route.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_cache_manager/flutter_cache_manager.dart';
 import 'package:hitomiviewer/constants/api.dart';
 import 'package:hitomiviewer/services/image_embedding.dart';
@@ -10,6 +12,14 @@ import 'package:hitomiviewer/services/hitomi.dart';
 import 'package:hitomiviewer/store.dart';
 import 'package:provider/provider.dart';
 import 'package:http/http.dart' as http;
+
+// Zero-shot classification 결과
+class TagMatch {
+  final String tag;
+  final double similarity; // softmax 확률 값 (0~1)
+
+  TagMatch({required this.tag, required this.similarity});
+}
 
 @RoutePage()
 class GalleryAnalysisScreen extends StatefulWidget {
@@ -33,12 +43,122 @@ class _GalleryAnalysisScreenState extends State<GalleryAnalysisScreen> {
   Map<int, int> imageRefreshKeys = {}; // 이미지 새로고침을 위한 키
   Map<int, String?> imageLoadErrors = {}; // 이미지 로딩 에러
   Map<int, List<double>?> imageEmbeddings = {}; // 이미지별 임베딩 저장
+  Map<int, List<TagMatch>?> imageTags = {}; // 이미지별 분류된 태그 (Zero-shot classification)
+  Map<String, List<double>> tagEmbeddingCache = {}; // 태그 임베딩 캐시
+  
+  // 미리 정의된 태그 목록 (히토미 관련)
+  static const List<String> predefinedTags = [
+    // 장르/스타일
+    'manga', 'anime', 'illustration', 'comic', 'artwork',
+    'colored', 'monochrome', 'sketch', 'watercolor',
+    
+    // 인물
+    'girl', 'boy', 'woman', 'man', 'character',
+    'solo', 'multiple girls', 'couple',
+    
+    // 포즈/동작
+    'standing', 'sitting', 'lying', 'walking',
+    'smiling', 'looking at viewer',
+    
+    // 의상
+    'school uniform', 'casual clothes', 'traditional clothes',
+    'dress', 'swimsuit',
+    
+    // 장소/배경
+    'indoors', 'outdoors', 'bedroom', 'classroom',
+    'nature', 'city', 'beach', 'sky',
+    
+    // 분위기
+    'cute', 'beautiful', 'cool', 'elegant',
+    'romantic', 'dramatic', 'peaceful',
+    
+    // 기타
+    'portrait', 'full body', 'close-up',
+    'detailed', 'simple background', 'complex background',
+  ];
 
   @override
   void initState() {
     super.initState();
     detail = fetchDetail(widget.id.toString());
     // PE-Core 모델은 앱 시작 시 초기화됨
+  }
+
+  // 코사인 유사도 계산
+  double _cosineSimilarity(List<double> a, List<double> b) {
+    if (a.length != b.length) return 0.0;
+    
+    double dotProduct = 0.0;
+    double normA = 0.0;
+    double normB = 0.0;
+    
+    for (int i = 0; i < a.length; i++) {
+      dotProduct += a[i] * b[i];
+      normA += a[i] * a[i];
+      normB += b[i] * b[i];
+    }
+    
+    if (normA == 0.0 || normB == 0.0) return 0.0;
+    return dotProduct / (sqrt(normA) * sqrt(normB));
+  }
+
+  // 태그 임베딩 가져오기 (캐시 사용)
+  Future<List<double>> _getTagEmbedding(String tag) async {
+    if (tagEmbeddingCache.containsKey(tag)) {
+      return tagEmbeddingCache[tag]!;
+    }
+    
+    try {
+      final embedding = await embeddingService.getTextEmbedding(tag);
+      tagEmbeddingCache[tag] = embedding;
+      return embedding;
+    } catch (e) {
+      debugPrint('태그 임베딩 생성 실패: $tag - $e');
+      return [];
+    }
+  }
+
+  // Zero-shot classification으로 태그 분류
+  // temperature: 낮을수록 확률 분포가 더 sharp해짐 (기본값: 0.01)
+  Future<List<TagMatch>> _findMatchingTags(List<double> imageEmbedding, {int topK = 8, double temperature = 0.01}) async {
+    final similarities = <double>[];
+    final validTags = <String>[];
+    
+    // 모든 태그에 대해 유사도 계산
+    for (final tag in predefinedTags) {
+      final tagEmbedding = await _getTagEmbedding(tag);
+      if (tagEmbedding.isEmpty) continue;
+      
+      final similarity = _cosineSimilarity(imageEmbedding, tagEmbedding);
+      similarities.add(similarity);
+      validTags.add(tag);
+    }
+    
+    if (similarities.isEmpty) return [];
+    
+    // Softmax를 적용하여 확률 분포로 변환 (temperature scaling 적용)
+    final scaledSimilarities = similarities.map((s) => s / temperature).toList();
+    final maxSimilarity = scaledSimilarities.reduce((a, b) => a > b ? a : b);
+    
+    // 수치 안정성을 위해 최댓값을 빼줌
+    final expValues = scaledSimilarities.map((s) => exp(s - maxSimilarity)).toList();
+    final sumExp = expValues.reduce((a, b) => a + b);
+    final probabilities = expValues.map((e) => e / sumExp).toList();
+    
+    // 태그와 확률을 매칭
+    final matches = <TagMatch>[];
+    for (var i = 0; i < validTags.length; i++) {
+      matches.add(TagMatch(
+        tag: validTags[i],
+        similarity: probabilities[i], // 이제 확률 값
+      ));
+    }
+    
+    // 확률 순으로 정렬
+    matches.sort((a, b) => b.similarity.compareTo(a.similarity));
+    
+    // 상위 topK개만 반환 (확률이 임계값 이상인 것만)
+    return matches.take(topK).where((m) => m.similarity > 0.001).toList();
   }
 
   String _parseImageError(Object error) {
@@ -159,6 +279,8 @@ class _GalleryAnalysisScreenState extends State<GalleryAnalysisScreen> {
 
   void _showAnalysisInfo(int index) {
     final embedding = imageEmbeddings[index];
+    final tags = imageTags[index];
+    
     if (embedding == null) {
       return;
     }
@@ -170,6 +292,10 @@ class _GalleryAnalysisScreenState extends State<GalleryAnalysisScreen> {
     final minVal = embedding.reduce((a, b) => a < b ? a : b);
     final maxVal = embedding.reduce((a, b) => a > b ? a : b);
 
+    // 벡터를 텍스트로 변환
+    final vectorText = embedding.map((e) => e.toStringAsFixed(6)).join(', ');
+    final jsonText = jsonEncode(embedding);
+
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
@@ -177,70 +303,239 @@ class _GalleryAnalysisScreenState extends State<GalleryAnalysisScreen> {
           children: [
             const Icon(Icons.analytics, color: Colors.blue),
             const SizedBox(width: 8),
-            Text('이미지 ${index + 1} 분석 정보'),
+            Expanded(child: Text('이미지 ${index + 1} 분석 정보')),
           ],
         ),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _buildInfoRow('임베딩 차원', '${embedding.length}차원'),
-              const Divider(),
-              _buildInfoRow('평균값', mean.toStringAsFixed(6)),
-              _buildInfoRow('표준편차', stdDev.toStringAsFixed(6)),
-              _buildInfoRow('최소값', minVal.toStringAsFixed(6)),
-              _buildInfoRow('최대값', maxVal.toStringAsFixed(6)),
-              const Divider(),
-              const SizedBox(height: 8),
-              Text(
-                '벡터 미리보기',
-                style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                  color: Colors.grey[700],
-                ),
-              ),
-              const SizedBox(height: 4),
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: Colors.grey[200],
-                  borderRadius: BorderRadius.circular(4),
-                ),
-                child: Text(
-                  '[${embedding.take(10).map((e) => e.toStringAsFixed(3)).join(', ')}, ...]',
-                  style: TextStyle(
-                    fontFamily: 'monospace',
-                    fontSize: 10,
-                    color: Colors.grey[800],
-                  ),
-                ),
-              ),
-              const SizedBox(height: 12),
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: Colors.blue.shade50,
-                  borderRadius: BorderRadius.circular(4),
-                  border: Border.all(color: Colors.blue.shade200),
-                ),
-                child: Row(
-                  children: [
-                    Icon(Icons.info_outline, size: 16, color: Colors.blue.shade700),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        '이 임베딩은 이미지의 시각적 특징을 수치화한 것입니다.',
+        content: SizedBox(
+          width: double.maxFinite,
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // 태그 정보
+                if (tags != null && tags.isNotEmpty) ...[
+                  Row(
+                    children: [
+                      Icon(Icons.label, size: 18, color: Colors.purple[700]),
+                      const SizedBox(width: 8),
+                      Text(
+                        '분류된 태그 (Zero-shot Classification)',
                         style: TextStyle(
-                          fontSize: 12,
-                          color: Colors.blue.shade700,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.grey[700],
+                          fontSize: 13,
                         ),
                       ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 6,
+                    runSpacing: 6,
+                    children: tags.map((tag) {
+                      final probability = (tag.similarity * 100).toStringAsFixed(2);
+                      // 확률에 따라 색상 강도 조절 (로그 스케일 사용)
+                      final normalizedProb = tag.similarity / tags.first.similarity;
+                      return Chip(
+                        label: Text(
+                          tag.tag,
+                          style: const TextStyle(fontSize: 11),
+                        ),
+                        backgroundColor: Color.lerp(
+                          Colors.grey[300],
+                          Colors.purple[300],
+                          normalizedProb,
+                        ),
+                        padding: const EdgeInsets.symmetric(horizontal: 4),
+                        visualDensity: VisualDensity.compact,
+                        labelPadding: const EdgeInsets.symmetric(horizontal: 4),
+                        avatar: CircleAvatar(
+                          backgroundColor: Colors.purple[700],
+                          radius: 12,
+                          child: Text(
+                            '$probability%',
+                            style: const TextStyle(
+                              fontSize: 6,
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                      );
+                    }).toList(),
+                  ),
+                  const SizedBox(height: 8),
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: Colors.purple.shade50,
+                      borderRadius: BorderRadius.circular(4),
+                      border: Border.all(color: Colors.purple.shade200),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(Icons.info_outline, size: 16, color: Colors.purple.shade700),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            '태그는 Zero-shot Classification으로 자동 분류됩니다.\n각 태그는 softmax 확률 값을 나타냅니다.',
+                            style: TextStyle(
+                              fontSize: 10,
+                              color: Colors.purple.shade700,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const Divider(height: 24),
+                ],
+                
+                // 임베딩 통계
+                _buildInfoRow('임베딩 차원', '${embedding.length}차원'),
+                const Divider(),
+                _buildInfoRow('평균값', mean.toStringAsFixed(6)),
+                _buildInfoRow('표준편차', stdDev.toStringAsFixed(6)),
+                _buildInfoRow('최소값', minVal.toStringAsFixed(6)),
+                _buildInfoRow('최대값', maxVal.toStringAsFixed(6)),
+                const Divider(),
+                const SizedBox(height: 12),
+                
+                // 벡터 미리보기
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      '벡터 미리보기',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        color: Colors.grey[700],
+                      ),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.copy, size: 18),
+                      tooltip: '첫 10개 값 복사',
+                      onPressed: () {
+                        final preview = '[${embedding.take(10).map((e) => e.toStringAsFixed(6)).join(', ')}, ...]';
+                        Clipboard.setData(ClipboardData(text: preview));
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('미리보기 복사 완료'),
+                            duration: Duration(seconds: 1),
+                          ),
+                        );
+                      },
                     ),
                   ],
                 ),
-              ),
-            ],
+                const SizedBox(height: 4),
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Colors.grey[200],
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: Text(
+                    '[${embedding.take(10).map((e) => e.toStringAsFixed(3)).join(', ')}, ...]',
+                    style: TextStyle(
+                      fontFamily: 'monospace',
+                      fontSize: 10,
+                      color: Colors.grey[800],
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                
+                // 전체 벡터 (스크롤 가능)
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      '전체 벡터',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        color: Colors.grey[700],
+                      ),
+                    ),
+                    Row(
+                      children: [
+                        IconButton(
+                          icon: const Icon(Icons.copy, size: 18),
+                          tooltip: '배열 형식으로 복사',
+                          onPressed: () {
+                            Clipboard.setData(ClipboardData(text: '[$vectorText]'));
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('배열 형식으로 복사 완료'),
+                                duration: Duration(seconds: 1),
+                              ),
+                            );
+                          },
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.data_object, size: 18),
+                          tooltip: 'JSON으로 복사',
+                          onPressed: () {
+                            Clipboard.setData(ClipboardData(text: jsonText));
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('JSON 형식으로 복사 완료'),
+                                duration: Duration(seconds: 1),
+                              ),
+                            );
+                          },
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                Container(
+                  height: 150,
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Colors.grey[200],
+                    borderRadius: BorderRadius.circular(4),
+                    border: Border.all(color: Colors.grey[400]!),
+                  ),
+                  child: SingleChildScrollView(
+                    child: SelectableText(
+                      '[$vectorText]',
+                      style: TextStyle(
+                        fontFamily: 'monospace',
+                        fontSize: 9,
+                        color: Colors.grey[800],
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Colors.blue.shade50,
+                    borderRadius: BorderRadius.circular(4),
+                    border: Border.all(color: Colors.blue.shade200),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(Icons.info_outline, size: 16, color: Colors.blue.shade700),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          '이 임베딩은 이미지의 시각적 특징을 수치화한 것입니다.\n복사 버튼을 눌러 데이터를 활용하세요.',
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: Colors.blue.shade700,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
         actions: [
@@ -574,6 +869,34 @@ class _GalleryAnalysisScreenState extends State<GalleryAnalysisScreen> {
               ),
             ),
           ),
+          // 태그 배지 (상단 우측)
+          if (isAnalyzed && imageTags[index] != null && imageTags[index]!.isNotEmpty)
+            Positioned(
+              top: 4,
+              right: 4,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                decoration: BoxDecoration(
+                  color: Colors.purple.withOpacity(0.85),
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.label, color: Colors.white, size: 10),
+                    const SizedBox(width: 3),
+                    Text(
+                      imageTags[index]!.first.tag,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 9,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
           // 에러 정보 배지 (하단)
           if (imageLoadErrors[index] != null)
             Positioned(
@@ -667,18 +990,33 @@ class _GalleryAnalysisScreenState extends State<GalleryAnalysisScreen> {
       final embedding = await embeddingService.getImageEmbedding(imageBytes);
 
       debugPrint('✅ 이미지 $index 분석 완료 (임베딩 차원: ${embedding.length})');
+      debugPrint('🏷️ 태그 분류 시작 (Zero-shot classification)...');
+
+      // 태그 분류 (Zero-shot classification)
+      final tags = await _findMatchingTags(embedding);
+      debugPrint('✅ 태그 분류 완료: ${tags.map((t) => '${t.tag}(${(t.similarity * 100).toStringAsFixed(2)}%)').join(', ')}');
+      
+      // 확률 합계 검증 (디버깅용)
+      if (tags.isNotEmpty) {
+        final totalProb = tags.map((t) => t.similarity).reduce((a, b) => a + b);
+        debugPrint('   (표시된 태그들의 확률 합계: ${(totalProb * 100).toStringAsFixed(2)}%)');
+      }
 
       setState(() {
         analyzed[index] = true;
         analyzing[index] = false;
         imageEmbeddings[index] = embedding; // 임베딩 저장
+        imageTags[index] = tags; // 태그 저장
       });
 
-      // 임베딩 저장 (나중에 추가 가능)
+      // 완료 메시지
       if (mounted) {
+        final topTag = tags.isNotEmpty ? tags.first : null;
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('이미지 ${index + 1} 분석 완료 (탭하여 정보 보기)'),
+            content: Text(topTag != null
+              ? '이미지 ${index + 1} 분석 완료 - ${topTag.tag} (${(topTag.similarity * 100).toStringAsFixed(1)}%)'
+              : '이미지 ${index + 1} 분석 완료 (탭하여 정보 보기)'),
             duration: const Duration(seconds: 2),
             backgroundColor: Colors.green,
           ),
@@ -790,6 +1128,7 @@ class _GalleryAnalysisScreenState extends State<GalleryAnalysisScreen> {
           imageLoadErrors[i] = null; // 이미지 로딩 에러 초기화
           analyzed[i] = false;
           imageEmbeddings[i] = null; // 임베딩 데이터 초기화
+          imageTags[i] = null; // 태그 데이터 초기화
         }
       });
       
@@ -863,6 +1202,7 @@ class _GalleryAnalysisScreenState extends State<GalleryAnalysisScreen> {
         imageLoadErrors[index] = null;
         analyzed[index] = false;
         imageEmbeddings[index] = null; // 임베딩 데이터 초기화
+        imageTags[index] = null; // 태그 데이터 초기화
       });
       
       debugPrint('  ✅ 새로고침 키: $newKey → 위젯 재빌드 트리거');
